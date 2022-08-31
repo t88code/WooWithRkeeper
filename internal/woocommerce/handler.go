@@ -74,10 +74,14 @@ type WebhookCreatOrder struct {
 			DisplayKey string `json:"display_key"`
 			Id         int    `json:"id"`
 			Value      struct {
-				Summary  string `json:"summary,omitempty"`
-				Duration string `json:"duration,omitempty"`
-				Persons  string `json:"persons,omitempty"`
-				Start    struct {
+				Summary        string `json:"summary,omitempty"`
+				Duration       string `json:"duration,omitempty"`
+				Persons        string `json:"persons,omitempty"`
+				PersonType     string `json:"persontype,omitempty"`     // todo Тип заказчика (Юр.лицо/Физ.лицо)
+				CompanyDetails string `json:"companydetails,omitempty"` // todo Реквизиты Юр.лица (если выбрано Юр.лицо)
+				Comment        string
+
+				Start struct {
 					Timezone     string `json:"timezone"`
 					Date         string `json:"date"`
 					TimezoneType int    `json:"timezone_type"`
@@ -460,8 +464,26 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 	//создать Props в RK7
 	//заполнить Props через CreateOrder
 	//отобразить Props на кассе
-	var notation []string
-	var title, id, persons, sum, summary, statusPayed, duration string
+	var Notation []string
+
+	var ID int = WebhookCreatOrder.Id
+	var HallName string   // Props - HallName - Наименование зала
+	var DateStart string  // Props - DateStart - Дата бронирования
+	var TimeStart string  // Props - TimeStart - Время начала пользования залом todo time.Format()
+	var TimeEnd string    // Props - TimeEnd - Время окончания пользования залом
+	var Persons string    // Props - Persons - Кол-во гостей
+	var PersonType string // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
+	var PersonName string // Props - PersonName - Имя заказчика
+	var LastName string = WebhookCreatOrder.Billing.LastName
+	var CompanyName string = WebhookCreatOrder.Billing.Company // Props - CompanyName - Наименование Юр.лица (если выбрано Юр.лицо)
+	var CompanyDetails string                                  // Props - CompanyDetails - Реквизиты Юр.лица (если выбрано Юр.лицо)
+	var Phone string = WebhookCreatOrder.Billing.Phone         // Props - Phone - Телефон заказчика
+	var Email string = WebhookCreatOrder.Billing.Email         // Props - Email - e-mail заказчика
+	var Comment string                                         // Props - Comment - Комментарий
+	var OrderDetails string = strings.Join(Notation, "\n")     // Props - OrderDetails - Дополнительные параметры к заказу
+	var OrderSum string = WebhookCreatOrder.Total              // Props - OrderSum - Итоговая стоимость заказа
+	var DateCreated string = WebhookCreatOrder.DateCreated     // Props - DateCreated - Дата оформления заказа
+
 	var servicesNotation, dishsNotation []string //Банкетное меню lite (25000 ₽), Каскад из шампанского (10000 ₽), Ковровая дорожка (3000 ₽)
 	//Booking #3049 Unpaid
 	//28.07.2022
@@ -475,57 +497,62 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 
 	//заполнить Props
 	var Props []*modelsRK7API.Prop
+
+	Props = append(Props, &modelsRK7API.Prop{
+		Name:  "ID",
+		Value: strconv.Itoa(ID),
+	})
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "Email",
-		Value: WebhookCreatOrder.Billing.Email,
+		Value: Email,
 	})
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "Phone",
-		Value: WebhookCreatOrder.Billing.Phone,
+		Value: Phone,
 	})
 	Props = append(Props, &modelsRK7API.Prop{
-		Name:  "FirstName",
-		Value: fmt.Sprint(WebhookCreatOrder.Billing.FirstName),
+		Name:  "PersonName",
+		Value: fmt.Sprint(PersonName),
 	})
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "LastName",
-		Value: fmt.Sprint(WebhookCreatOrder.Billing.LastName),
+		Value: fmt.Sprint(LastName),
 	})
-	sum = WebhookCreatOrder.Total // "total":"62000",
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "Sum",
-		Value: sum,
-	})
-	id = strconv.Itoa(WebhookCreatOrder.Id) // "id":3048,
-	Props = append(Props, &modelsRK7API.Prop{
-		Name:  "ID",
-		Value: id,
+		Value: OrderSum,
 	})
 
 	//line_items
 	if len(WebhookCreatOrder.LineItems) > 0 {
-		title = fmt.Sprint(WebhookCreatOrder.LineItems[0].Name) //  "name":"\u0420\u0435\u0441\u0442\u043e\u0440\u0430\u043d \u00abLe Noir\u00bb",
+
+		HallName = WebhookCreatOrder.LineItems[0].Name // Props - HallName - Наименование зала
+
 		Props = append(Props, &modelsRK7API.Prop{
-			Name:  "Title",
-			Value: title,
+			Name:  "HallName",
+			Value: HallName,
 		})
 		if len(WebhookCreatOrder.LineItems[0].MetaData) == 2 {
 
-			summary = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Summary   // "summary":"28.07.2022  07:00 - 15:00",
-			persons = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Persons   // "persons":"10",
-			duration = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Duration // "duration":"8",
+			DateStart = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Start.Date          // Props - DateStart - Дата бронирования
+			TimeStart = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Start.Date          // Props - TimeStart - Время начала пользования залом todo time.Format()
+			TimeEnd = WebhookCreatOrder.LineItems[0].MetaData[0].Value.End.Date              // Props - TimeEnd - Время окончания пользования залом
+			Persons = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Persons               // Props - Persons - Кол-во гостей
+			PersonType = WebhookCreatOrder.LineItems[0].MetaData[0].Value.PersonType         // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
+			CompanyDetails = WebhookCreatOrder.LineItems[0].MetaData[0].Value.CompanyDetails // Props - CompanyDetails - Реквизиты Юр.лица (если выбрано Юр.лицо)
+			Comment = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Comment               // Props - Comment - Комментарий
 
 			Props = append(Props, &modelsRK7API.Prop{
-				Name:  "Summary",
-				Value: summary,
+				Name:  "DateStart",
+				Value: DateStart,
+			})
+			Props = append(Props, &modelsRK7API.Prop{
+				Name:  "TimeStart",
+				Value: TimeStart,
 			})
 			Props = append(Props, &modelsRK7API.Prop{
 				Name:  "Persons",
-				Value: persons, // TODO createOrder attr
-			})
-			Props = append(Props, &modelsRK7API.Prop{
-				Name:  "Duration",
-				Value: duration, // TODO createOrder attr
+				Value: Persons, // TODO createOrder attr
 			})
 
 			for _, dish := range WebhookCreatOrder.LineItems[0].MetaData[0].Value.Resources {
@@ -544,9 +571,9 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 		}
 	}
 
-	statusPayed = "Unpaid" //TODO statusPayed
+	statusPayed := "Unpaid" //TODO statusPayed
 	//собираем примечание
-	notation = append(notation, fmt.Sprintf("%s", title))                        // //  "name":"\u0420\u0435\u0441\u0442\u043e\u0440\u0430\u043d \u00abLe Noir\u00bb", = Ресторан «Le Noir»
+	notation = append(notation, fmt.Sprintf("%s", name))                         // //  "name":"\u0420\u0435\u0441\u0442\u043e\u0440\u0430\u043d \u00abLe Noir\u00bb", = Ресторан «Le Noir»
 	notation = append(notation, fmt.Sprintf("Booking #%s, %s", id, statusPayed)) // TODO > not correct >>> Booking #3049 <<< Unpaid
 	//notation = append(notation, "\n")
 	notation = append(notation, summary)                                           // 28.07.2022  07:00 - 15:00
