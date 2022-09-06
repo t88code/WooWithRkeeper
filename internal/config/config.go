@@ -56,6 +56,15 @@ type (
 		DBSQLITE struct {
 			DB string
 		}
+		CACHE struct {
+			TimeUpdate int
+		}
+		WOOCOMMERCE struct {
+			URL            string
+			Key            string
+			Secret         string
+			MenuCategoryId int
+		}
 	}
 )
 

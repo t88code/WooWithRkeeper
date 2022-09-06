@@ -1,65 +1,65 @@
 package models
 
 type Author struct {
-	ID   string `xml:"id,attr"`
-	Code string `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   string `xml:"id,attr,omitempty"`
+	Code string `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 	Role *Role  `xml:"Role"`
 }
 
 type Creator struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 	Role *Role  `xml:"Role"`
 }
 
 type Waiter struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 	Role *Role  `xml:"Role"`
 }
 
 type Role struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 }
 
 type OrderCategory struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 }
 
 type OrderType struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 }
 
 type Table struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 }
 
 type Guests struct {
-	Count int      `xml:"count,attr"`
+	Count int      `xml:"count,attr,omitempty"`
 	Guest *[]Guest `xml:"Guest"`
 }
 
 type Guest struct {
-	GuestLabel string     `xml:"guestLabel,attr"`
-	CardCode   string     `xml:"cardCode,attr"`
-	ClientID   int64      `xml:"clientID,attr"`
-	AddressID  int64      `xml:"addressID,attr"`
+	GuestLabel string     `xml:"guestLabel,attr,omitempty"`
+	CardCode   string     `xml:"cardCode,attr,omitempty"`
+	ClientID   int64      `xml:"clientID,attr,omitempty"`
+	AddressID  int64      `xml:"addressID,attr,omitempty"`
 	Interface  *Interface `xml:"Interface"` //TODO не точно и требует проверки
 }
 
 type Interface struct {
-	Code int `xml:"code,attr"`
+	Code int `xml:"code,attr,omitempty"`
 }
 
 type ExternalProps struct {
@@ -67,14 +67,14 @@ type ExternalProps struct {
 }
 
 type Prop struct {
-	Name  string `xml:"name,attr"`
-	Value string `xml:"value,attr"`
+	Name  string `xml:"name,attr,omitempty"`
+	Value string `xml:"value,attr,omitempty"`
 }
 
 type Dish struct {
 	ID          int    `xml:"id,attr,omitempty"`
 	Code        int    `xml:"code,attr,omitempty"`
-	Name        string `xml:"name,attr"`
+	Name        string `xml:"name,attr,omitempty"`
 	Uni         string `xml:"uni,attr,omitempty"`
 	LineGuid    string `xml:"line_guid,attr,omitempty"`
 	State       string `xml:"state,attr,omitempty"`
@@ -92,27 +92,27 @@ type Station struct {
 }
 
 type PriceScale struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 }
 
 type TradeGroup struct {
-	ID   int    `xml:"id,attr"`
-	Code int    `xml:"code,attr"`
-	Name string `xml:"name,attr"`
+	ID   int    `xml:"id,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	Name string `xml:"name,attr,omitempty"`
 }
 
 type Session struct {
-	Uni          int         `xml:"uni,attr"`
-	LineGuid     string      `xml:"line_guid,attr"`
-	State        int         `xml:"state,attr"`
-	SessionID    int         `xml:"sessionID,attr"`
-	IsDraft      int         `xml:"isDraft,attr"`
-	RemindTime   string      `xml:"remindTime,attr"`
-	StartService string      `xml:"startService,attr"`
-	Printed      int         `xml:"printed,attr"`
-	CookMins     int         `xml:"cookMins,attr"`
+	Uni          int         `xml:"uni,attr,omitempty"`
+	LineGuid     string      `xml:"line_guid,attr,omitempty"`
+	State        int         `xml:"state,attr,omitempty"`
+	SessionID    int         `xml:"sessionID,attr,omitempty"`
+	IsDraft      int         `xml:"isDraft,attr,omitempty"`
+	RemindTime   string      `xml:"remindTime,attr,omitempty"`
+	StartService string      `xml:"startService,attr,omitempty"`
+	Printed      int         `xml:"printed,attr,omitempty"`
+	CookMins     int         `xml:"cookMins,attr,omitempty"`
 	Station      *Station    `xml:"Station"`
 	Author       *Author     `xml:"Author"`
 	Creator      *Creator    `xml:"Creator"`
@@ -122,24 +122,24 @@ type Session struct {
 }
 
 type Order struct {
-	Visit                int            `xml:"visit,attr"`
-	OrderIdent           int            `xml:"orderIdent,attr"`
-	Guid                 string         `xml:"guid,attr"`
-	URL                  string         `xml:"url,attr"`
-	OrderName            string         `xml:"orderName,attr"`
-	Version              int            `xml:"version,attr"`
-	Crc32                string         `xml:"crc32,attr"`
-	OrderSum             int            `xml:"orderSum,attr"`
-	UnpaidSum            int            `xml:"unpaidSum,attr"`
-	DiscountSum          int            `xml:"discountSum,attr"`
-	TotalPieces          string         `xml:"totalPieces,attr"`
-	SeqNumber            int            `xml:"seqNumber,attr"`
-	Paid                 int            `xml:"paid,attr"`
-	Finished             int            `xml:"finished,attr"`
-	PersistentComment    string         `xml:"persistentComment,attr"`
-	NonPersistentComment string         `xml:"nonPersistentComment,attr"`
-	OpenTime             string         `xml:"openTime,attr"`
-	CookMins             int            `xml:"cookMins,attr"`
+	Visit                int            `xml:"visit,attr,omitempty"`
+	OrderIdent           int            `xml:"orderIdent,attr,omitempty"`
+	Guid                 string         `xml:"guid,attr,omitempty"`
+	URL                  string         `xml:"url,attr,omitempty"`
+	OrderName            string         `xml:"orderName,attr,omitempty"`
+	Version              int            `xml:"version,attr,omitempty"`
+	Crc32                string         `xml:"crc32,attr,omitempty"`
+	OrderSum             int            `xml:"orderSum,attr,omitempty"`
+	UnpaidSum            int            `xml:"unpaidSum,attr,omitempty"`
+	DiscountSum          int            `xml:"discountSum,attr,omitempty"`
+	TotalPieces          string         `xml:"totalPieces,attr,omitempty"`
+	SeqNumber            int            `xml:"seqNumber,attr,omitempty"`
+	Paid                 int            `xml:"paid,attr,omitempty"`
+	Finished             int            `xml:"finished,attr,omitempty"`
+	PersistentComment    string         `xml:"persistentComment,attr,omitempty"`
+	NonPersistentComment string         `xml:"nonPersistentComment,attr,omitempty"`
+	OpenTime             string         `xml:"openTime,attr,omitempty"`
+	CookMins             int            `xml:"cookMins,attr,omitempty"`
 	Creator              *Creator       `xml:"Creator"`
 	Waiter               *Waiter        `xml:"Waiter"`
 	OrderCategory        *OrderCategory `xml:"OrderCategory"`

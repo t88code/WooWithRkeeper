@@ -97,8 +97,8 @@ func CreateDealInRkeeper(DealID int) error {
 	//отправить CreateOrder
 	resultCreateOrder, err := RK7API.CreateOrder(Order)
 	if err != nil {
-		logger.Infof("Ошибка при создании заказа RK, error: %v", err)
-		return errors.Wrapf(err, "failed RK7API.CreateOrder(%v)", Order)
+		logger.Infof("Ошибка при создании заказа RK: %v", err)
+		return errors.Wrap(err, "ошибка в RK7API.CreateOrder")
 	}
 	logger.Info("Заказ в RK создан успешно")
 

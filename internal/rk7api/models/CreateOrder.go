@@ -10,17 +10,43 @@ type RK7QueryCreateOrder struct {
 	} `xml:"RK7CMD"`
 }
 
+// VisitElement is Ссылка на визит. Можно выбрать либо по guid либо по visit
+type VisitElement struct {
+	Guid  interface{} `xml:"guid,attr,omitempty"`
+	Visit int         `xml:"visit,attr,omitempty"`
+}
+
+// ExtraTables ...
+type ExtraTables struct {
+	Item []interface{} `xml:"item"`
+}
+
+// Order ... TODO непроверен до конца
 type OrderInRK7QueryCreateOrder struct {
-	PersistentComment string    `xml:"persistentComment,attr"`
-	ExtSource         string    `xml:"extSource,attr"`
-	ExtID             string    `xml:"extID,attr"`
-	Reserv            int       `xml:"reserv,attr"`
-	OrderType         OrderType `xml:"OrderType"`
-	Table             Table     `xml:"Table"`
-	Guests            struct {
+	ExtSource            string         `xml:"extSource,attr"`
+	ExtID                string         `xml:"extID,attr"`
+	OpenTime             string         `xml:"openTime,attr,omitempty"`
+	Duration             string         `xml:"duration,attr,omitempty"`
+	Holder               string         `xml:"holder,attr,omitempty"`
+	PromoCode            string         `xml:"promoCode,attr,omitempty"`
+	PersistentComment    string         `xml:"persistentComment,attr,omitempty"`
+	NonPersistentComment string         `xml:"nonPersistentComment,attr,omitempty"`
+	Guid                 string         `xml:"guid,attr,omitempty"`
+	Visit                *VisitElement  `xml:"Visit"`
+	Table                *Table         `xml:"Table"`
+	Station              *Station       `xml:"Station"`
+	Creator              *Creator       `xml:"Creator"`
+	Waiter               *Waiter        `xml:"Waiter"`
+	OrderCategory        *OrderCategory `xml:"OrderCategory"`
+	OrderType            *OrderType     `xml:"OrderType"`
+	Defaulter            interface{}    `xml:"Defaulter"`
+	GuestType            interface{}    `xml:"GuestType"`
+	Guests               *struct {
 		Item *[]Guest `xml:"Item"`
 	} `xml:"Guests"`
-	ExternalProps ExternalProps `xml:"ExternalProps,omitempty"`
+	ExtraTables   *ExtraTables   `xml:"ExtraTables"`
+	ExternalProps *ExternalProps `xml:"ExternalProps"`
+	DeliveryBlock interface{}    `xml:"DeliveryBlock"`
 }
 
 type RK7QueryResultCreateOrder struct {

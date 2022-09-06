@@ -37,18 +37,72 @@ http://new.hotelslovakia.ru/restoran-le-nuar/
 ### Сделать
 1. Создать Props в RK7
    1. Примечание
-   2. Сумма заказа
-   3. Состав заказа
+    2. Сумма заказа
+    3. Состав заказа
       1. Наименование позиции
       2. Цена позиции
       3. "quantity": false,
-   4. ID заказа
-   5. Phone
-   6. Email
-   7. link
-   8. Дата брони
+    4. ID заказа
+    5. Phone
+    6. Email
+    7. link
+    8. Дата брони
 2. Заполнить Props через CreateOrder
 3. Отобразить Props на кассе
+4. Обновить Props через форму на кассе
+
+## Настройки RK7
+
+* Один заказ на визит - Включен
+* Пустые визиты - Выключен
+* Скрипт на форме Редактирование заказа
+  * Событие - CheckViewOnShow
+  * Код:
+```
+procedure saveProp(key, value: String);
+var
+  Props: TVisitOrderInfo;
+begin
+  Props := TVisitOrderInfo.Create();
+  Props.CustomProps.Values[key] := value;       
+  RKCheck.UpdateOrderProps(Props);
+end;
+
+procedure updateProps();
+var value : string;
+  ErrorCode : integer;
+  Prop: TCustomProp;
+  i: integer;
+begin
+  for i := 0 to RKCheck.CurrentOrder.CustomProps.Count - 1 do
+    begin
+    Prop := TCustomProp(RKCheck.CurrentOrder.CustomProps.Items[i]);
+    if (prop.propname='HallName') or (prop.propname='CompanyName') or (prop.propname='PersonName') or (prop.propname='LastName') or (prop.propname='OrderDetails') then 
+            begin       
+            //gui.showmessage(Prop.propname + ' ' + Prop.Value);
+            ErrorCode := HttpGet('http://192.168.0.11:8081/prop/' + inttostr(RKCheck.CurrentOrder.UVN) + '/' + prop.propname , value); 
+            //gui.showmessage('error code:' + inttostr(ErrorCode) + inttostr(RKCheck.CurrentOrder.UVN) + prop.propname + value);       
+            if ErrorCode = 0 then
+               begin 
+               saveProp(prop.propname, value);
+               //gui.showmessage('обновлено:' + inttostr(RKCheck.CurrentOrder.UVN) + prop.propname + value);
+               end; 
+            //gui.showmessage('error: ' + inttostr(ErrorCode));
+            //gui.showmessage('value' + value);
+            end;   
+    end;
+end;
+
+
+procedure CheckViewOnShowScript(Sender: TObject);
+var  R : string;
+  ErrorCode : integer;
+begin
+ updateProps();
+end;
+```
+
+
 
 ## Бронирование залов
 ### Наименовение полей
@@ -101,3 +155,5 @@ http://new.hotelslovakia.ru/restoran-le-nuar/
 * Дата оформления заказа
   * DateCreated string = WebhookCreatOrder.DateCreated
   * Props - DateCreated
+
+    
