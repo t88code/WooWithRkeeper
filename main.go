@@ -4,8 +4,9 @@ import (
 	"WooWithRkeeper/internal/cache"
 	"WooWithRkeeper/internal/config"
 	"WooWithRkeeper/internal/telegram"
-	"WooWithRkeeper/internal/wooapi"
 	"WooWithRkeeper/internal/woocommerce"
+
+	//"WooWithRkeeper/internal/woocommerce"
 	"WooWithRkeeper/pkg/logging"
 	"fmt"
 	"github.com/julienschmidt/httprouter"
@@ -189,11 +190,11 @@ func main() {
 	logger := logging.GetLogger()
 	logger.Info("Start Main")
 	defer logger.Info("End Main")
-	var err error
+	//var err error
 
 	cfg := config.GetConfig()
 
-	WOOAPI := wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
+	//WOOAPI := wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
 
 	//var p models.Product
 	//p.Id = 3124

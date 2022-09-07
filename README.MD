@@ -64,7 +64,7 @@ var
   Props: TVisitOrderInfo;
 begin
   Props := TVisitOrderInfo.Create();
-  Props.CustomProps.Values[key] := value;       
+  Props.CustomProps.Values[key+'1251'] := value;
   RKCheck.UpdateOrderProps(Props);
 end;
 
@@ -79,30 +79,33 @@ begin
     Prop := TCustomProp(RKCheck.CurrentOrder.CustomProps.Items[i]);
     if (prop.propname='HallName') or (prop.propname='CompanyName') or (prop.propname='PersonName') or (prop.propname='LastName') or (prop.propname='OrderDetails') then 
             begin       
-            //gui.showmessage(Prop.propname + ' ' + Prop.Value);
-            ErrorCode := HttpGet('http://192.168.0.11:8081/prop/' + inttostr(RKCheck.CurrentOrder.UVN) + '/' + prop.propname , value); 
-            //gui.showmessage('error code:' + inttostr(ErrorCode) + inttostr(RKCheck.CurrentOrder.UVN) + prop.propname + value);       
+            ErrorCode := HttpGet('http://192.168.0.11:8081/prop/' + inttostr(RKCheck.CurrentOrder.UVN) + '/' + prop.propname , value);      
             if ErrorCode = 0 then
                begin 
                saveProp(prop.propname, value);
-               //gui.showmessage('обновлено:' + inttostr(RKCheck.CurrentOrder.UVN) + prop.propname + value);
                end; 
-            //gui.showmessage('error: ' + inttostr(ErrorCode));
-            //gui.showmessage('value' + value);
             end;   
     end;
 end;
-
 
 procedure CheckViewOnShowScript(Sender: TObject);
 var  R : string;
   ErrorCode : integer;
 begin
- updateProps();
-end;
+ upd
 ```
 
+## Win1251 кодировка
+### Алгоритм реализации:
 
+Скрипт, при открытии заказа на кассе rkeeper, отправляет Get запрос в микросервис с параметром name. В ответе скрипт получает значение поля name и сохраняет его в расширенном свойстве с именем name1521. МС всегда игнорирует поля с именем name1251 и в результате не получает ошибку при попытке преобразовать win1251<>utf8.
+
+#### Поля win1251:
+* HallName
+* CompanyName
+* PersonName
+* LastName
+* OrderDetails
 
 ## Бронирование залов
 ### Наименовение полей

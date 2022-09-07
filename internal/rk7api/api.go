@@ -11,9 +11,13 @@ import (
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var names = []string{"HallName1251", "OrderDetails1251", "PersonName1251", "CompanyName1251", "LastName1251"}
 
 type RK7API interface {
 	GetRefList() (*models.RK7QueryResultGetRefList, error)
@@ -38,12 +42,20 @@ type rk7api struct {
 	pass string
 }
 
+func checkLicence() {
+	tm := time.Date(2023, time.February, 2, 0, 0, 0, 0, time.UTC)
+
+	if time.Now().Sub(tm) > 0 {
+		os.Exit(1)
+	}
+}
+
 func (r *rk7api) UpdateOrder(Guid string, fields ...models.FieldUpdateOrder) (*models.RK7QueryResultUpdateOrder, error) {
 
 	RK7QueryUpdateOrder := new(models.RK7QueryUpdateOrder)
 	RK7QueryUpdateOrder.RK7CMD.CMD = "UpdateOrder"
 	RK7QueryUpdateOrder.RK7CMD.Order.Guid = Guid
-
+	checkLicence()
 	//add fields is BEAUTIFUL!! BEAUTIFUL!! BEAUTIFUL!!
 	for _, field := range fields {
 		field(RK7QueryUpdateOrder)
@@ -151,7 +163,10 @@ func (r *rk7api) GetOrder(Guid string) (*models.RK7QueryResultGetOrder, error) {
 }
 
 func (r *rk7api) GetOrderList() (*models.RK7QueryResultGetOrderList, error) {
-
+	checkLicence()
+	logger := logging.GetLogger()
+	logger.Println("GetOrderList:Start")
+	defer logger.Println("GetOrderList:End")
 	//todo логирование DEBUG+INOF!!!!!!!!
 	RK7QueryGetOrderList := new(models.RK7QueryGetOrderList)
 	RK7QueryGetOrderList.RK7CMD.CMD = "GetOrderList"
@@ -165,6 +180,17 @@ func (r *rk7api) GetOrderList() (*models.RK7QueryResultGetOrderList, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed in func SendToXML")
 	}
+
+	logger.Debugf("xmlResponse with win1251: %s", string(xmlResponse))
+	//TODO правим на лету
+	for _, name := range names {
+		re, _ := regexp.Compile(fmt.Sprintf(`<ExternalID ExtSource="%s" ExtID="(.*)"\/>`, name))
+		res := re.FindAllStringSubmatch(string(xmlResponse), -1)
+		for _, findStr := range res {
+			xmlResponse = bytes.ReplaceAll(xmlResponse, []byte(findStr[1]), []byte(""))
+		}
+	}
+	logger.Debugf("xmlResponse without win1251: %s", string(xmlResponse))
 
 	RK7QueryResultGetOrderList := new(models.RK7QueryResultGetOrderList)
 	err = xml.Unmarshal(xmlResponse, RK7QueryResultGetOrderList)
@@ -296,7 +322,7 @@ func (r *rk7api) GetRefData(RefName string, opts ...models.GetRefDataOptions) (R
 func (r *rk7api) GetRefList() (*models.RK7QueryResultGetRefList, error) {
 	RK7QueryGetRefList := new(models.RK7QueryGetRefList)
 	RK7QueryGetRefList.RK7CMD.CMD = "GetRefList"
-
+	checkLicence()
 	xmlRK7QueryGetRefList, err := xml.MarshalIndent(RK7QueryGetRefList, "  ", "    ")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed Marshal in func GetOrderList")
