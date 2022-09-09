@@ -187,7 +187,7 @@ func (r *rk7api) GetOrderList() (*models.RK7QueryResultGetOrderList, error) {
 		re, _ := regexp.Compile(fmt.Sprintf(`<ExternalID ExtSource="%s" ExtID="(.*)"\/>`, name))
 		res := re.FindAllStringSubmatch(string(xmlResponse), -1)
 		for _, findStr := range res {
-			xmlResponse = bytes.Replace(xmlResponse, []byte(findStr[1]), []byte(""), 1)
+			xmlResponse = bytes.ReplaceAll(xmlResponse, []byte(findStr[0]), []byte(fmt.Sprintf(`<ExternalID ExtSource="%s" ExtID=""/>`, name)))
 		}
 	}
 	logger.Debugf("xmlResponse without win1251: %s", string(xmlResponse))
