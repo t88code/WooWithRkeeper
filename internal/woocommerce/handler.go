@@ -470,13 +470,13 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 	var Notation []string
 
 	var ID int = WebhookCreatOrder.Id
-	var HallName string   // Props - HallName - Наименование зала
-	var DateStart string  // Props - DateStart - Дата бронирования
-	var TimeStart string  // Props - TimeStart - Время начала пользования залом
-	var TimeEnd string    // Props - TimeEnd - Время окончания пользования залом
-	var Persons string    // Props - Persons - Кол-во гостей
-	var PersonType string // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
-	var PersonName string // Props - PersonName - Имя заказчика
+	var HallName string                                              // Props - HallName - Наименование зала
+	var DateStart string                                             // Props - DateStart - Дата бронирования
+	var TimeStart string                                             // Props - TimeStart - Время начала пользования залом
+	var TimeEnd string                                               // Props - TimeEnd - Время окончания пользования залом
+	var Persons string                                               // Props - Persons - Кол-во гостей
+	var PersonType string                                            // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
+	var PersonName = fmt.Sprint(WebhookCreatOrder.Billing.FirstName) // Props - PersonName - Имя заказчика
 	var LastName string = fmt.Sprint(WebhookCreatOrder.Billing.LastName)
 	var CompanyName string = fmt.Sprint(WebhookCreatOrder.Billing.Company) // Props - CompanyName - Наименование Юр.лица (если выбрано Юр.лицо)
 	var CompanyDetails string                                              // Props - CompanyDetails - Реквизиты Юр.лица (если выбрано Юр.лицо)

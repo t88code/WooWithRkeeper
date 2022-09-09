@@ -53,7 +53,7 @@ func (c *orders) Get(visitID int) (*modelsRK7API.Order, error) {
 				if visit.VisitID == visitID {
 					//визит найден
 					logger.Info("визит найден в RK7")
-					logger.Info("проверка заказ в визите")
+					logger.Info("проверка заказа в визите")
 					if len(visit.Orders.Order) > 0 {
 						//заказ найден
 						logger.Info("заказы есть в визите")
@@ -97,9 +97,9 @@ func (c *orders) Get(visitID int) (*modelsRK7API.Order, error) {
 			if visit.VisitID == visitID {
 				//визит найден
 				logger.Info("визит найден в RK7")
-				logger.Info("проверка заказ в визите")
+				logger.Info("проверка заказа в визите")
 				if len(visit.Orders.Order) > 0 {
-					//заказ найден
+					//заказ найден //TODO GetORder кажется кеш постоянно обновялется в заказах
 					logger.Info("заказы есть в визите")
 					orderGuid := visit.Orders.Order[len(visit.Orders.Order)-1].Guid
 					getOrder, err := RK7API.GetOrder(orderGuid)
