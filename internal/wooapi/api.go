@@ -239,11 +239,11 @@ func (w *wooapi) ProductUpdate(p *models.Product) (*models.Product, error) {
 	logger.Println("ProductUpdate:>Start")
 	defer logger.Println("ProductUpdate:>End")
 
-	if p.Id == 0 {
+	if p.ID == 0 {
 		return nil, errors.New("не указана ID продукта")
 	}
 
-	endpoint := fmt.Sprintf("products/%d", p.Id)
+	endpoint := fmt.Sprintf("products/%d", p.ID)
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if r, err := w.api.Put(endpoint, p); err != nil {
@@ -553,11 +553,11 @@ func (w *wooapi) ProductCategoryUpdate(pc *models.ProductCategory) (*models.Prod
 	logger.Println("ProductCategoryUpdate:>Start")
 	defer logger.Println("ProductCategoryUpdate:>End")
 
-	if pc.Id == 0 {
+	if pc.ID == 0 {
 		return nil, errors.New("не указана ID папки меню")
 	}
 
-	endpoint := fmt.Sprintf("products/categories/%d", pc.Id)
+	endpoint := fmt.Sprintf("products/categories/%d", pc.ID)
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if r, err := w.api.Put(endpoint, pc); err != nil {
@@ -572,7 +572,6 @@ func (w *wooapi) ProductCategoryUpdate(pc *models.ProductCategory) (*models.Prod
 		if bodyBytes, err := ioutil.ReadAll(r.Body); err != nil {
 			return nil, errors.Wrapf(err, "ошибка при ioutil.ReadAll(r.Body): error: %v", err)
 		} else {
-
 			logger.Debugf(string(bodyBytes))
 			var ErrorWoo models.ErrorWoo
 			err := json.Unmarshal(bodyBytes, &ErrorWoo)

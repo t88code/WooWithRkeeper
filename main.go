@@ -3,7 +3,10 @@ package main
 import (
 	"WooWithRkeeper/internal/cache"
 	"WooWithRkeeper/internal/config"
+	"WooWithRkeeper/internal/sync"
 	"WooWithRkeeper/internal/telegram"
+	"WooWithRkeeper/internal/wooapi"
+	"WooWithRkeeper/internal/wooapi/options"
 	"WooWithRkeeper/internal/woocommerce"
 
 	//"WooWithRkeeper/internal/woocommerce"
@@ -194,11 +197,21 @@ func main() {
 
 	cfg := config.GetConfig()
 
-	//WOOAPI := wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
+	WOOAPI := wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
+
+	categoryList, err := WOOAPI.ProductCategoryList(options.Search("Банкетные залы 1"))
+	//categoryList, err := WOOAPI.ProductCategoryList()
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	fmt.Println(categoryList)
+	panic(66)
 
 	//var p models.Product
-	//p.Id = 3124
-	//p.Categories = append(p.Categories, &models.Categories{Id: 299})
+	//p.ID = 3124
+	//p.Categories = append(p.Categories, &models.Categories{ID: 299})
 	//
 	//productUpdate, err := WOOAPI.ProductUpdate(&p)
 	//if err != nil {
@@ -207,7 +220,7 @@ func main() {
 	//}
 	//
 	//logger.Info(productUpdate.Name)
-	//logger.Info(productUpdate.Id)
+	//logger.Info(productUpdate.ID)
 	//logger.Info(productUpdate.Categories)
 
 	//var c models.ProductCategory
@@ -220,11 +233,11 @@ func main() {
 	//	return
 	//}
 	//logger.Info(productCategory.Name)
-	//logger.Info(productCategory.Id)
+	//logger.Info(productCategory.ID)
 	//logger.Info(productCategory.Parent)
 
 	//var cNew models.ProductCategory
-	//cNew.Id = 300
+	//cNew.ID = 300
 	//cNew.Parent = cfg.WOOCOMMERCE.MenuCategoryId
 	//
 	//productCategoryUpdate, err := WOOAPI.ProductCategoryUpdate(&cNew)
@@ -234,7 +247,7 @@ func main() {
 	//}
 	//
 	//logger.Info(productCategoryUpdate.Name)
-	//logger.Info(productCategoryUpdate.Id)
+	//logger.Info(productCategoryUpdate.ID)
 	//logger.Info(productCategoryUpdate.Parent)
 	//
 	//panic(2323)
@@ -263,7 +276,7 @@ func main() {
 	//	return
 	//}
 
-	//go sync.SyncMenuService()
+	go sync.SyncMenuService()
 	go telegram.BotStart()
 
 	//http.HandleFunc("/webhook/creat_order", HandlerWebhookCreateOrder)

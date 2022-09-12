@@ -35,3 +35,10 @@ func Force(value bool) Option {
 		}
 	}
 }
+
+func Search(value string) Option {
+	return func(f *OptionStruct) {
+		f.Key = "search"
+		f.Value = value
+	}
+}

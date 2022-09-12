@@ -1,7 +1,7 @@
 package models
 
 type ProductCategory struct {
-	Id          int    `json:"id,omitempty"`
+	ID          int    `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Slug        string `json:"slug,omitempty"`
 	Parent      int    `json:"parent,omitempty"`
