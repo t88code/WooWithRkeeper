@@ -38,8 +38,9 @@ type menu struct {
 	CateglistMapByIdent map[int]*modelsRK7API.Categlist
 
 	//WOO
-	ProductsMapByID          map[int]*modelsWOOAPI.Product
-	ProductCategoriesMapByID map[int]*modelsWOOAPI.ProductCategory
+	ProductsMapByID            map[int]*modelsWOOAPI.Product
+	ProductCategoriesMapByID   map[int]*modelsWOOAPI.ProductCategory
+	ProductCategoriesMapByName map[string]*modelsWOOAPI.ProductCategory
 }
 
 func (m *menu) GetMenuitems() ([]*modelsRK7API.MenuitemItem, error) {
@@ -65,6 +66,10 @@ func (m *menu) GetProductsMapByID() (map[int]*modelsWOOAPI.Product, error) {
 
 func (m *menu) GetProductCategoriesMapByID() (map[int]*modelsWOOAPI.ProductCategory, error) {
 	return m.ProductCategoriesMapByID, nil
+}
+
+func (m *menu) GetProductCategoriesMapByName() (map[string]*modelsWOOAPI.ProductCategory, error) {
+	return m.ProductCategoriesMapByName, nil
 }
 
 func (m *menu) RefreshCateglist() error {

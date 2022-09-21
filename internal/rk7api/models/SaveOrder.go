@@ -14,7 +14,8 @@ type RK7QuerySaveOrder struct {
 		} `xml:"Order"`
 		Session struct {
 			Station Station `xml:"Station"`
-			Dish    *[]Dish `xml:"Dish"`
+			Dish    []Dish  `xml:"Dish"`
+			Prepay  *Prepay `xml:"Prepay"`
 		} `xml:"Session"`
 	} `xml:"RK7CMD"`
 }

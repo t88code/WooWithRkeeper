@@ -55,11 +55,12 @@ type Guest struct {
 	CardCode   string     `xml:"cardCode,attr,omitempty"`
 	ClientID   int64      `xml:"clientID,attr,omitempty"`
 	AddressID  int64      `xml:"addressID,attr,omitempty"`
-	Interface  *Interface `xml:"Interface"` //TODO не точно и требует проверки
+	Interface  *Interface `xml:"Interface"`
 }
 
 type Interface struct {
-	Code int `xml:"code,attr,omitempty"`
+	Code int    `xml:"code,attr,omitempty"`
+	ID   string `xml:"id,attr,omitempty"`
 }
 
 type ExternalProps struct {
@@ -148,4 +149,17 @@ type Order struct {
 	Station              *Station       `xml:"Station"`
 	ExternalProps        *ExternalProps `xml:"ExternalProps"`
 	Session              []Session      `xml:"Session,omitempty"`
+}
+
+type Prepay struct {
+	Code               int        `xml:"code,attr,omitempty"`
+	ID                 int        `xml:"id,attr,omitempty"`
+	Guid               string     `xml:"guid,attr,omitempty"`
+	Amount             int        `xml:"amount,attr,omitempty"`
+	Deleted            int        `xml:"deleted,attr,omitempty"`
+	Promised           string     `xml:"promised,attr,omitempty"`
+	LineGuid           string     `xml:"line_guid,attr,omitempty"`
+	CardCode           string     `xml:"cardCode,attr,omitempty"`
+	ExtTransactionInfo string     `xml:"extTransactionInfo,attr,omitempty"`
+	Interface          *Interface `xml:"Interface"`
 }

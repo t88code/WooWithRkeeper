@@ -78,6 +78,7 @@ func SyncCategList(rk7api rk7api.RK7API, wooapi wooapi.WOOAPI, db *sqlx.DB) erro
 		// TODO поиск надо делать по уникальному идентификатору из кипера, потому что сперва происходит создание продукта на основе кипера и потом попытка присвоить идентификатор
 		// и если идентификатор не присвоился в кипере, то блюдо надо будет !!создавать снова!! потому что оно не найдено
 		// пока сделать в description добавить идентификатор и по нему искать в productCategoriesMapByID
+		// сделать поиск по имени в productCategoriesMapByName
 		if productCategory, found := productCategoriesMapByID[item.WooID]; found {
 			logger.Infof("Папка найдена в WOO: Name: %s, ID: %s, Parent: %s", productCategory.Name, productCategory.ID, productCategory.Parent) // TODO добавить поле с идентификатором из кипера(через разработку сайта)
 
@@ -112,7 +113,6 @@ func SyncCategList(rk7api rk7api.RK7API, wooapi wooapi.WOOAPI, db *sqlx.DB) erro
 
 			_, err := wooapi.ProductCategoryUpdate(pc)
 			if err != nil {
-				fmt.Println("ERRRRROOOORRR1: ", err.Error()) // TODO удалить
 				if err.Error() != ERROR_PRODUCCATEGORIES_NOT_FOUND {
 					SyncMenuErrors = append(SyncMenuErrors, fmt.Sprintf("Не удалось обновить Папку в WOO: Name: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d, error: %v, sync: 1", item.Name, item.ItemIdent, item.WooID, item.WooParentCategoryID, item.Status, err))
 					continue
@@ -174,16 +174,16 @@ func SyncCategList(rk7api rk7api.RK7API, wooapi wooapi.WOOAPI, db *sqlx.DB) erro
 					//для этого использовать поле Destination
 					//для хорошего использовать поле специально созданное для ProductCategory в Woo
 					//делаем поиск по имени
-
+					categlistItemInRK7[i].WooID = 0 // TODO INCORRECT!!!
 				} else {
 					SyncMenuErrors = append(SyncMenuErrors, fmt.Sprintf("Не удалось создать Папку в WOO: Name: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d, error: %v, sync: 1", item.Name, item.ItemIdent, item.WooID, item.WooParentCategoryID, item.Status, err))
 					continue
 				}
 			} else {
 				logger.Info("Папка успешно создана в WOO")
+				categlistItemInRK7[i].WooID = productCategoryAdd.ID
 			}
 
-			categlistItemInRK7[i].WooID = productCategoryAdd.ID
 			logger.Infof("Обновляем Categlist в rkeeper. CatelistID=%d", categlistItemInRK7[i].WooID)
 
 			var categlist []*modelsRK7API.Categlist

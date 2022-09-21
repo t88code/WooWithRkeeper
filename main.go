@@ -3,10 +3,7 @@ package main
 import (
 	"WooWithRkeeper/internal/cache"
 	"WooWithRkeeper/internal/config"
-	"WooWithRkeeper/internal/sync"
 	"WooWithRkeeper/internal/telegram"
-	"WooWithRkeeper/internal/wooapi"
-	"WooWithRkeeper/internal/wooapi/options"
 	"WooWithRkeeper/internal/woocommerce"
 
 	//"WooWithRkeeper/internal/woocommerce"
@@ -197,86 +194,7 @@ func main() {
 
 	cfg := config.GetConfig()
 
-	WOOAPI := wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
-
-	categoryList, err := WOOAPI.ProductCategoryList(options.Search("Банкетные залы 1"))
-	//categoryList, err := WOOAPI.ProductCategoryList()
-	if err != nil {
-		logger.Error(err)
-		return
-	}
-
-	fmt.Println(categoryList)
-	panic(66)
-
-	//var p models.Product
-	//p.ID = 3124
-	//p.Categories = append(p.Categories, &models.Categories{ID: 299})
-	//
-	//productUpdate, err := WOOAPI.ProductUpdate(&p)
-	//if err != nil {
-	//	logger.Error(err)
-	//	return
-	//}
-	//
-	//logger.Info(productUpdate.Name)
-	//logger.Info(productUpdate.ID)
-	//logger.Info(productUpdate.Categories)
-
-	//var c models.ProductCategory
-	//c.Name = "групаа тестовая 3"
-	//c.Parent = cfg.WOOCOMMERCE.MenuCategoryId
-	//
-	//productCategory, err := WOOAPI.ProductCategoryAdd(&c)
-	//if err != nil {
-	//	logger.Error(err)
-	//	return
-	//}
-	//logger.Info(productCategory.Name)
-	//logger.Info(productCategory.ID)
-	//logger.Info(productCategory.Parent)
-
-	//var cNew models.ProductCategory
-	//cNew.ID = 300
-	//cNew.Parent = cfg.WOOCOMMERCE.MenuCategoryId
-	//
-	//productCategoryUpdate, err := WOOAPI.ProductCategoryUpdate(&cNew)
-	//if err != nil {
-	//	logger.Error(err)
-	//	return
-	//}
-	//
-	//logger.Info(productCategoryUpdate.Name)
-	//logger.Info(productCategoryUpdate.ID)
-	//logger.Info(productCategoryUpdate.Parent)
-	//
-	//panic(2323)
-	//
-	//_, err = cache.NewCacheMenu()
-	//if err != nil {
-	//	logger.Errorf("не удалось получить меню: %v", err)
-	//	return
-	//}
-
-	//RK7API := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7.User, cfg.RK7.Pass)
-	//getOrderList, err := RK7API.GetOrderList()
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	//fmt.Println(123)
-	//s := getOrderList.Visit[len(getOrderList.Visit)-1].Orders.Order[0].ExternalID[8].ExtID
-	//
-	//fmt.Println([]byte(s))
-	//
-	//panic(234)
-
-	//err = WOOAPI.ProductCategoryDelete(292, options.Force(true))
-	//if err != nil {
-	//	logger.Error(err)
-	//	return
-	//}
-
-	go sync.SyncMenuService()
+	//go sync.SyncMenuService()
 	go telegram.BotStart()
 
 	//http.HandleFunc("/webhook/creat_order", HandlerWebhookCreateOrder)

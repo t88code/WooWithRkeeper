@@ -32,7 +32,7 @@ type RK7API interface {
 	GetOrder(Guid string) (*models.RK7QueryResultGetOrder, error)
 
 	CreateOrder(Order *models.OrderInRK7QueryCreateOrder) (*models.RK7QueryResultCreateOrder, error)
-	SaveOrder(Visit int, Guid string, Station int, Dish *[]models.Dish) (*models.RK7QueryResultSaveOrder, error)
+	SaveOrder(Visit int, Guid string, Station int, Dish []models.Dish, Prepay *models.Prepay) (*models.RK7QueryResultSaveOrder, error)
 	UpdateOrder(Guid string, fields ...models.FieldUpdateOrder) (*models.RK7QueryResultUpdateOrder, error)
 }
 
@@ -207,13 +207,14 @@ func (r *rk7api) GetOrderList() (*models.RK7QueryResultGetOrderList, error) {
 	return RK7QueryResultGetOrderList, nil
 }
 
-func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs *[]models.Dish) (*models.RK7QueryResultSaveOrder, error) {
+func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs []models.Dish, Prepay *models.Prepay) (*models.RK7QueryResultSaveOrder, error) {
 	RK7QuerySaveOrder := new(models.RK7QuerySaveOrder)
 	RK7QuerySaveOrder.RK7CMD.CMD = "SaveOrder"
 	RK7QuerySaveOrder.RK7CMD.Order.Visit = Visit
 	RK7QuerySaveOrder.RK7CMD.Order.Guid = Guid
 	RK7QuerySaveOrder.RK7CMD.Session.Station.Code = StationCode
 	RK7QuerySaveOrder.RK7CMD.Session.Dish = Dishs
+	RK7QuerySaveOrder.RK7CMD.Session.Prepay = Prepay
 
 	xmlQuery, err := xml.MarshalIndent(RK7QuerySaveOrder, "  ", "    ")
 	if err != nil {
