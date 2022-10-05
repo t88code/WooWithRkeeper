@@ -65,6 +65,14 @@ type (
 			Secret         string
 			MenuCategoryId int
 		}
+		XMLINTERFACE struct {
+			UserName  string
+			Password  string
+			Token     string
+			RestCode  int
+			ProductID string
+			GUID      string
+		}
 	}
 )
 

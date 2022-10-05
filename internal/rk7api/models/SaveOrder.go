@@ -15,7 +15,10 @@ type RK7QuerySaveOrder struct {
 		Session struct {
 			Station Station `xml:"Station"`
 			Dish    *[]Dish `xml:"Dish"`
+			Prepay  *Prepay `xml:"Prepay"`
 		} `xml:"Session"`
+
+		LicenseInfo LicenseInfo `xml:"LicenseInfo"`
 	} `xml:"RK7CMD"`
 }
 
@@ -31,6 +34,7 @@ type RK7QueryResultSaveOrder struct {
 	WorkTime        string   `xml:"WorkTime,attr"`
 	Processed       string   `xml:"Processed,attr"`
 	ArrivalDateTime string   `xml:"ArrivalDateTime,attr"`
+	RK7ErrorN       string   `xml:"RK7ErrorN,attr,omitempty"`
 	Order           *Order   `xml:"Order"`
 	Session         struct {
 		LineGuid  string `xml:"line_guid,attr"`

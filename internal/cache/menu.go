@@ -25,21 +25,29 @@ type CacheMenu interface {
 	RefreshProducts() error
 	RefreshProductCategories() error
 	GetProductsMapByID() (map[int]*modelsWOOAPI.Product, error)
+	GetProductsMapByRKeeperID() (map[int]*modelsWOOAPI.Product, error)
 	GetProductCategoriesMapByID() (map[int]*modelsWOOAPI.ProductCategory, error)
+	GetProductCategoriesMapByName() (map[string]*modelsWOOAPI.ProductCategory, error)
+	GetProductCategoriesMapByRkeeperID() (map[int]*modelsWOOAPI.ProductCategory, error)
 }
 
 var cacheMenuGlobal menu
 
 type menu struct {
 	//RK7
-	MenuitemItemInRK7   []*modelsRK7API.MenuitemItem
-	MenuRK7MapByIdent   map[int]*modelsRK7API.MenuitemItem
+	MenuitemItemInRK7 []*modelsRK7API.MenuitemItem
+	MenuRK7MapByIdent map[int]*modelsRK7API.MenuitemItem
+
 	CateglistItemInRK7  []*modelsRK7API.Categlist
 	CateglistMapByIdent map[int]*modelsRK7API.Categlist
 
 	//WOO
-	ProductsMapByID          map[int]*modelsWOOAPI.Product
-	ProductCategoriesMapByID map[int]*modelsWOOAPI.ProductCategory
+	ProductsMapByID        map[int]*modelsWOOAPI.Product
+	ProductsMapByRKeeperID map[int]*modelsWOOAPI.Product
+
+	ProductCategoriesMapByID        map[int]*modelsWOOAPI.ProductCategory
+	ProductCategoriesMapByName      map[string]*modelsWOOAPI.ProductCategory
+	ProductCategoriesMapByRKeeperID map[int]*modelsWOOAPI.ProductCategory
 }
 
 func (m *menu) GetMenuitems() ([]*modelsRK7API.MenuitemItem, error) {
@@ -63,8 +71,20 @@ func (m *menu) GetProductsMapByID() (map[int]*modelsWOOAPI.Product, error) {
 	return m.ProductsMapByID, nil
 }
 
+func (m *menu) GetProductsMapByRKeeperID() (map[int]*modelsWOOAPI.Product, error) {
+	return m.ProductsMapByRKeeperID, nil
+}
+
 func (m *menu) GetProductCategoriesMapByID() (map[int]*modelsWOOAPI.ProductCategory, error) {
 	return m.ProductCategoriesMapByID, nil
+}
+
+func (m *menu) GetProductCategoriesMapByName() (map[string]*modelsWOOAPI.ProductCategory, error) {
+	return m.ProductCategoriesMapByName, nil
+}
+
+func (m *menu) GetProductCategoriesMapByRkeeperID() (map[int]*modelsWOOAPI.ProductCategory, error) {
+	return m.ProductCategoriesMapByRKeeperID, nil
 }
 
 func (m *menu) RefreshCateglist() error {
@@ -73,7 +93,10 @@ func (m *menu) RefreshCateglist() error {
 	logger.Info("Start RefreshCateglist")
 	defer logger.Info("End RefreshCateglist")
 	cfg := config.GetConfig()
-	RK7API := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass)
+	RK7API, err := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass)
+	if err != nil {
+		return errors.New("failed rk7api.NewAPI()")
+	}
 
 	//получить список всех Categlist из RK
 	logger.Info("Получить список Categlist из RK7")
@@ -96,8 +119,8 @@ func (m *menu) RefreshCateglist() error {
 	}
 
 	for i, item := range CateglistInRK7.RK7Reference.Items.Item {
-		m.CateglistItemInRK7 = append(m.CateglistItemInRK7, CateglistInRK7.RK7Reference.Items.Item[i])
-		m.CateglistMapByIdent[item.ItemIdent] = CateglistInRK7.RK7Reference.Items.Item[i]
+		m.CateglistItemInRK7 = append(m.CateglistItemInRK7, &CateglistInRK7.RK7Reference.Items.Item[i])
+		m.CateglistMapByIdent[item.ItemIdent] = &CateglistInRK7.RK7Reference.Items.Item[i]
 	}
 	logger.Infof("Создан CateglistMap, длина: %d", len(m.CateglistMapByIdent))
 
@@ -110,8 +133,10 @@ func (m *menu) RefreshMenuitems() error {
 	logger.Info("Start RefreshMenuitems")
 	defer logger.Info("End RefreshMenuitems")
 	cfg := config.GetConfig()
-	RK7API := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass)
-
+	RK7API, err := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass)
+	if err != nil {
+		return errors.New("failed rk7api.NewAPI()")
+	}
 	//получить актуальное меню RK7
 	logger.Info("Получить список всех блюд из RK7")
 	Rk7QueryResultGetRefDataMenuitems, err := RK7API.GetRefData("Menuitems",
@@ -184,10 +209,17 @@ func (m *menu) RefreshProductCategories() error {
 		m.ProductCategoriesMapByID = make(map[int]*modelsWOOAPI.ProductCategory)
 	}
 
+	if m.ProductCategoriesMapByName == nil {
+		m.ProductCategoriesMapByName = make(map[string]*modelsWOOAPI.ProductCategory)
+	}
+
 	for i, productCategory := range productCategories {
 		m.ProductCategoriesMapByID[productCategory.ID] = productCategories[i]
+		m.ProductCategoriesMapByName[productCategory.Name] = productCategories[i]
 	}
+
 	logger.Infof("Длина списка ProductCategoriesMapByID = %d\n", len(m.ProductCategoriesMapByID))
+	logger.Infof("Длина списка ProductCategoriesMapByName = %d\n", len(m.ProductCategoriesMapByName))
 
 	return nil
 }
@@ -222,21 +254,14 @@ func (m *menu) RefreshMenu() error {
 }
 
 func NewCacheMenu() (CacheMenu, error) {
-
 	logger := logging.GetLogger()
 	logger.Info("Start NewCacheMenu")
 	defer logger.Info("End NewCacheMenu")
-
-	err := cacheMenuGlobal.RefreshMenu()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed RefreshMenu()")
-	}
 
 	return &cacheMenuGlobal, nil
 }
 
 func GetCacheMenu() (CacheMenu, error) {
-
 	logger := logging.GetLogger()
 	logger.Info("Start GetCacheMenu")
 	defer logger.Info("End GetCacheMenu")

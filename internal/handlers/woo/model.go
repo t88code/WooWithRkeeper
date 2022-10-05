@@ -1,4 +1,4 @@
-package woocommerce
+package woo
 
 type WebhookCreatOrder struct {
 	Id               int    `json:"id"`

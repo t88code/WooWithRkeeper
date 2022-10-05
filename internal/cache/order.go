@@ -36,7 +36,10 @@ func (c *orders) Get(visitID int) (*modelsRK7API.Order, error) {
 	defer logger.Info("End CacheOrder Get")
 
 	cfg := config.GetConfig()
-	RK7API := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass) // todo проверить cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass в других местах
+	RK7API, err := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass) // todo проверить cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass в других местах
+	if err != nil {
+		return nil, errors.New("failed rk7api.NewAPI()")
+	}
 
 	logger.Infof("VisitID=%d", visitID)
 

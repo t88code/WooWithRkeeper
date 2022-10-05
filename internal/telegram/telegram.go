@@ -21,6 +21,17 @@ type User struct {
 
 var bot *tgbotapi.BotAPI
 
+func SendMessageToTelegramWithLogError(errorText string) {
+	logger := logging.GetLogger()
+	logger.Println("Start SendMessageToTelegramWithLogError")
+	defer logger.Println("End SendMessageToTelegramWithLogError")
+	logger.Error(errorText)
+	err := SendMessage(errorText)
+	if err != nil {
+		logger.Errorf("Не удалось отправить сообщение в телеграм: error: %v", err)
+	}
+}
+
 // отправить сообщение в телеграм юзерам из DB
 func SendMessage(messageText string) error {
 
@@ -38,13 +49,48 @@ func SendMessage(messageText string) error {
 		for chatID, user := range users {
 			logger.Info(chatID, user)
 
-			msg := tgbotapi.NewMessage(chatID, messageText)
-			//msg.ReplyToMessageID = messageID
-			msg.ParseMode = "HTML"
-			_, err = bot.Send(msg)
-			if err != nil {
-				return errors.Wrapf(err, "failed bot.Send(%v)", msg)
+			for {
+
+				if len(messageText) == 0 {
+					break
+				}
+
+				if len(messageText) > 4096 {
+
+					messageTextRune := []rune(messageText[:4096])
+
+					logger.Debugf("len(messageText):%d", len(messageText))
+					logger.Debugf("len([]rune(messageText)):%d", len([]rune(messageText)))
+
+					msg := tgbotapi.NewMessage(chatID, string(messageTextRune[:len(messageTextRune)-1]))
+					msg.ParseMode = "HTML"
+					_, err = bot.Send(msg)
+					if err != nil {
+						return errors.Wrapf(err, "failed bot.Send(%v)", msg)
+					}
+
+					logger.Debugf("messageText до обрезки, len=%d:\n%s", len(messageText), messageText)
+
+					messageText = string([]rune(messageText)[len(messageTextRune)-1:])
+
+					logger.Debugf("messageText обрезано:\n%s", string(messageTextRune[:len(messageTextRune)-1]))
+					logger.Debugf("messageText после обрезки, len=%d:\n%s", len(messageText), messageText)
+
+				} else {
+
+					logger.Debugf("messageText, len=%d:\n%s", len(messageText), messageText)
+
+					msg := tgbotapi.NewMessage(chatID, messageText)
+					msg.ParseMode = "HTML"
+					_, err = bot.Send(msg)
+					if err != nil {
+						return errors.Wrapf(err, "failed bot.Send(%v)", msg)
+					}
+					break
+				}
+
 			}
+
 		}
 	} else {
 		return errors.New("Bot.Send.Message:>Users in db is none")
@@ -76,7 +122,7 @@ func CreateDB() error {
 	db, err := sql.Open("sqlite3", "telegram.db")
 	if err != nil {
 		errorText := fmt.Sprintf(`failed sql.Open("sqlite3", "telegram.db"), error: %v`, err)
-		logger.Fatalf(errorText) //TODO надо проверить как отрабатывает logger.Fatalf
+		logger.Fatalf(errorText)
 		return errors.New(errorText)
 	}
 	defer func(db *sql.DB) {
@@ -101,7 +147,12 @@ func CreateDB() error {
 		logger.Fatal(errorText)
 		return errors.New(errorText)
 	}
-	statement.Exec() // Execute SQL Statements
+	result, err := statement.Exec()
+	if err != nil {
+		return errors.Wrapf(err, "failed in statement.Exec()")
+	} else {
+		logger.Debugf("statement.Exec() result %v", result)
+	}
 
 	logger.Info("CreateDB:>USERS created")
 
