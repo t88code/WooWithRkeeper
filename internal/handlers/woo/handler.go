@@ -442,25 +442,70 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 	logger.Debug("DateTimeStart: ", DateTimeStart)
 	logger.Debug("DurationRK: ", DurationRK)
 
+	var order *modelsRK7API.Order
 	//отправить CreateOrder
 	resultCreateOrder, err := RK7API.CreateOrder(Order)
 	if err != nil {
 		logger.Infof("Ошибка при создании заказа RK, error: %v", err)
 		return errors.Wrap(err, "ошибка в RK7API.CreateOrder")
+	} else {
+		order = resultCreateOrder.Order
+		logger.Info("Заказ в RK создан успешно")
 	}
 
-	logger.Info("Заказ в RK создан успешно")
-
-	//получить из кэша OrderProps
-	cacheOrder := cache.GetCacheOrder()
-	err = cacheOrder.Set(resultCreateOrder.Order)
+	//получить из кэша Order
+	cacheOrder := cache.GetCacheOrder() // TODO обновить кеш даже если просто сработа CreateOrder
+	err = cacheOrder.Set(order)
 	if err != nil {
 		return errors.Wrapf(err, "не удалось сохранить заказ (VisitID=%d) в кэше", resultCreateOrder.Order.Visit)
 	}
-
 	logger.Info("Заказ успешно сохранен в кэше")
 
-	////VisitID отправляем в WOO TODO
+	for _, metadata := range WebhookCreatOrder.MetaData {
+		if metadata.Key == "_wc_deposits_deposit_amount" {
+			deposit, err := strconv.Atoi(metadata.Value.(string))
+			if err != nil {
+				return errors.Wrapf(err, "не удалось конвертировать значение депозита=%s в число", metadata.Value.(string))
+			}
+			logger.Infof("Необходимо добавить предоплату, на сумму %d", deposit)
+
+			resultSaveOrder, err := RK7API.SaveOrder(resultCreateOrder.Order.Visit,
+				resultCreateOrder.Order.Guid,
+				cfg.RK7MID.StationCode,
+				nil,
+				&modelsRK7API.Prepay{
+					Code: cfg.RK7MID.CurrencyCode,
+					//ID: "",
+					//Guid:               "",
+					Amount: deposit * 100,
+					//Deleted:            "",
+					//Promised:           "",
+					//LineGuid:           "",
+					//CardCode:           "",
+					//ExtTransactionInfo: "",
+					//Interface: nil,
+				})
+			if err != nil {
+				return errors.Wrap(err, "ошибка при выполнении SaveOrder")
+			} else {
+				order = resultSaveOrder.Order
+				logger.Info("Предоплата успешно добавлена")
+			}
+			break
+		}
+	}
+
+	err = cacheOrder.Set(order)
+	if err != nil {
+		return errors.Wrapf(err, "не удалось сохранить заказ (VisitID=%d) в кэше", resultCreateOrder.Order.Visit)
+	}
+	logger.Info("Заказ успешно сохранен в кэше")
+
+	////VisitID отправляем в WOO
+	//TODO если не обновим, то не найдем заказ или??
+	//допустим будем искать по WOOID -> надо в Props cохранить
+	//допустим будем искать по VISITID -> надо в Props cохранить и в WOO>VISITID
+
 	//err = BX24API.DealUpdate(DealID,
 	//	modelsBX24API.VISITID(fmt.Sprint(resultCreateOrder.VisitID)),
 	//	modelsBX24API.ORDERNAME(resultCreateOrder.Order.OrderName))

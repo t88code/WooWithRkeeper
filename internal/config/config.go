@@ -24,6 +24,7 @@ type (
 			TableCode     int
 			StationCode   int
 			TimeoutError  int
+			CurrencyCode  int
 		}
 		BX24 struct {
 			URL            string
