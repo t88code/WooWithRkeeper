@@ -29,6 +29,7 @@ func SendMessageToTelegramWithLogError(errorText string) {
 	err := SendMessage(errorText)
 	if err != nil {
 		logger.Errorf("Не удалось отправить сообщение в телеграм: error: %v", err)
+		// tODO оправить на почту
 	}
 }
 

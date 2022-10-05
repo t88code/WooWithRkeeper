@@ -26,11 +26,6 @@ type (
 			TimeoutError  int
 			CurrencyCode  int
 		}
-		BX24 struct {
-			URL            string
-			FieldVISITID   string
-			FieldORDERNAME string
-		}
 		TELEGRAM struct {
 			BotToken string
 			Debug    int
@@ -42,7 +37,10 @@ type (
 			Debug int
 		}
 		MENUSYNC struct {
-			Timeout int
+			Timeout        int
+			SyncMenuitems  int
+			SyncCateglist  int
+			TelegramReport int
 		}
 		ORDERSYNC struct {
 			Timeout int
@@ -100,7 +98,7 @@ func GetConfig() *Config {
 
 		err = gcfg.ReadFileInto(&cfg, "config.ini")
 		if err != nil {
-			logger.Printf("Config:>Failed to parse gcfg data: %s", err)
+			logger.Fatalf("Config:>Failed to parse gcfg data: %s", err)
 		} else {
 			logger.Print("Config:>Config is read")
 		}

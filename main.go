@@ -2,21 +2,15 @@ package main
 
 import (
 	"WooWithRkeeper/internal/config"
-	http2 "WooWithRkeeper/internal/handlers/http"
+	http2 "WooWithRkeeper/internal/handlers/httphandler"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/version"
-
-	//"WooWithRkeeper/internal/woocommerce"
 	"WooWithRkeeper/pkg/logging"
 	"fmt"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 )
-
-const VERSION_MAJOR = 1
-const VERSION_MINOR = 0
-const VERISON_MICRO = 1
 
 //запросить меню
 //если версия не изменилась, то уснуть на 5 минут

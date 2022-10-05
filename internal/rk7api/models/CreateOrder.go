@@ -11,13 +11,13 @@ type RK7QueryCreateOrder struct {
 }
 
 type OrderInRK7QueryCreateOrder struct {
-	PersistentComment string     `xml:"persistentComment,attr"`
-	ExtSource         string     `xml:"extSource,attr"`
 	ExtID             string     `xml:"extID,attr"`
+	ExtSource         string     `xml:"extSource,attr"`
+	OpenTime          string     `xml:"openTime,attr,omitempty"`
+	Duration          string     `xml:"duration,attr,omitempty"`
+	PersistentComment string     `xml:"persistentComment,attr"`
 	OrderType         *OrderType `xml:"OrderType"`
 	Table             *Table     `xml:"Table"`
-	Duration          string
-	OpenTime          string
 	Guests            struct {
 		Item *[]Guest `xml:"Item"`
 	} `xml:"Guests"`

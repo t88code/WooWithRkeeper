@@ -19,12 +19,7 @@ func HandlerOtherAll(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 
 	err := r.ParseForm()
 	if err != nil {
-		err := telegram.SendMessage("Не удалось обработать вебхук на создание заказа")
-		if err != nil {
-			logger.Errorf("failed telegram.SendMessage(), error: %v", err)
-			fmt.Fprint(w, "Error")
-			return
-		}
+		telegram.SendMessageToTelegramWithLogError("Не удалось обработать вебхук на создание заказа")
 		fmt.Fprint(w, "Error")
 		return
 	}
@@ -65,12 +60,7 @@ func HandlerWebhookCreateOrder(w http.ResponseWriter, r *http.Request, _ httprou
 
 	err := r.ParseForm()
 	if err != nil {
-		err := telegram.SendMessage("Не удалось обработать вебхук на создание заказа")
-		if err != nil {
-			logger.Errorf("failed telegram.SendMessage(), error: %v", err)
-			fmt.Fprint(w, "Error")
-			return
-		}
+		telegram.SendMessageToTelegramWithLogError("Не удалось обработать вебхук на создание заказа")
 		fmt.Fprint(w, "Error")
 		return
 	}
@@ -94,16 +84,11 @@ func HandlerWebhookCreateOrder(w http.ResponseWriter, r *http.Request, _ httprou
 
 	logger.Debug("body\n\t", string(respBody))
 
-	err = woo.WebhookCreateOrderInRkeeper(respBody)
+	err = woo.WebhookCreateOrderInRKeeper(respBody)
 	if err != nil {
 		errorText := fmt.Sprintf("Не удалось обработать вебхук на создание заказа: %v", err)
 		logger.Error(errorText)
-		err := telegram.SendMessage(errorText)
-		if err != nil {
-			logger.Errorf("failed telegram.SendMessage(), error: %v", err)
-			fmt.Fprint(w, "Error")
-			return
-		}
+		telegram.SendMessageToTelegramWithLogError(errorText)
 		fmt.Fprint(w, "Error")
 		return
 	}

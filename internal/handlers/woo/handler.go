@@ -184,11 +184,11 @@ type WebhookCreatOrderOld struct {
 	} `json:"billing"`
 }
 
-func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
+func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 	logger := logging.GetLogger()
-	logger.Println("Start WebhookCreateOrderInRkeeper")
-	defer logger.Println("End WebhookCreateOrderInRkeeper")
+	logger.Println("Start WebhookCreateOrderInRKeeper")
+	defer logger.Println("End WebhookCreateOrderInRKeeper")
 	cfg := config.GetConfig()
 	RK7API, err := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7.User, cfg.RK7.Pass)
 	if err != nil {
@@ -239,6 +239,7 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 	var Duration string                                                    // Props - Duration - Продолжительность брони
 	var DateTimeStart string                                               // OpenTime
 	var DurationRK string                                                  //duration="1899-12-30T04:00:00"
+	var Deposit int                                                        // "10000"
 
 	var servicesNotation, dishsNotation []string
 	//Банкетное меню lite (25000 ₽), Каскад из шампанского (10000 ₽), Ковровая дорожка (3000 ₽)
@@ -287,6 +288,19 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 		Name:  "DateCreated",
 		Value: DateCreated,
 	})
+
+	//meta_data и приведение
+	for _, metaData := range WebhookCreatOrder.MetaData {
+		//предоплата
+		if metaData.Key == "_wc_deposits_deposit_amount" && metaData.Value != nil {
+			if value, ok := metaData.Value.(string); ok {
+				Deposit, err = strconv.Atoi(value)
+				if err != nil {
+					return errors.Wrapf(err, "не удалось конвертировать значение депозита=%s в число", value)
+				}
+			}
+		}
+	}
 
 	//line_items
 	if len(WebhookCreatOrder.LineItems) > 0 {
@@ -441,6 +455,7 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 	logger.Debug("Duration: ", Duration)
 	logger.Debug("DateTimeStart: ", DateTimeStart)
 	logger.Debug("DurationRK: ", DurationRK)
+	logger.Debug("Deposit: ", Deposit)
 
 	var order *modelsRK7API.Order
 	//отправить CreateOrder
@@ -461,37 +476,22 @@ func WebhookCreateOrderInRkeeper(jsonByteArray []byte) error {
 	}
 	logger.Info("Заказ успешно сохранен в кэше")
 
-	for _, metadata := range WebhookCreatOrder.MetaData {
-		if metadata.Key == "_wc_deposits_deposit_amount" {
-			deposit, err := strconv.Atoi(metadata.Value.(string))
-			if err != nil {
-				return errors.Wrapf(err, "не удалось конвертировать значение депозита=%s в число", metadata.Value.(string))
-			}
-			logger.Infof("Необходимо добавить предоплату, на сумму %d", deposit)
+	if Deposit != 0 {
+		prepay := new(modelsRK7API.Prepay)
+		prepay.Code = cfg.RK7MID.CurrencyCode
+		prepay.Amount = Deposit * 100
 
-			resultSaveOrder, err := RK7API.SaveOrder(resultCreateOrder.Order.Visit,
-				resultCreateOrder.Order.Guid,
-				cfg.RK7MID.StationCode,
-				nil,
-				&modelsRK7API.Prepay{
-					Code: cfg.RK7MID.CurrencyCode,
-					//ID: "",
-					//Guid:               "",
-					Amount: deposit * 100,
-					//Deleted:            "",
-					//Promised:           "",
-					//LineGuid:           "",
-					//CardCode:           "",
-					//ExtTransactionInfo: "",
-					//Interface: nil,
-				})
-			if err != nil {
-				return errors.Wrap(err, "ошибка при выполнении SaveOrder")
-			} else {
-				order = resultSaveOrder.Order
-				logger.Info("Предоплата успешно добавлена")
-			}
-			break
+		logger.Infof("Необходимо добавить предоплату, на сумму %d", Deposit)
+		resultSaveOrder, err := RK7API.SaveOrder(resultCreateOrder.Order.Visit,
+			resultCreateOrder.Order.Guid,
+			cfg.RK7MID.StationCode,
+			nil,
+			prepay)
+		if err != nil {
+			return errors.Wrap(err, "ошибка при выполнении SaveOrder")
+		} else {
+			order = resultSaveOrder.Order
+			logger.Info("Предоплата успешно добавлена")
 		}
 	}
 
