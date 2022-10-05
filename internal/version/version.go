@@ -3,8 +3,8 @@ package version
 import "fmt"
 
 const VERSION_MAJOR = 1
-const VERSION_MINOR = 0
-const VERISON_MICRO = 10
+const VERSION_MINOR = 1
+const VERISON_MICRO = 1
 
 var version *Version
 
