@@ -3,6 +3,7 @@ package main
 import (
 	"WooWithRkeeper/internal/config"
 	http2 "WooWithRkeeper/internal/handlers/httphandler"
+	check "WooWithRkeeper/internal/license"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/version"
 	"WooWithRkeeper/pkg/logging"
@@ -33,7 +34,7 @@ func main() {
 	logger.Infof("Version %s", v.String())
 	defer logger.Info("End Main")
 	//var err error
-
+	check.Check()
 	cfg := config.GetConfig()
 
 	//go sync.SyncMenuService()

@@ -1,6 +1,7 @@
 package config
 
 import (
+	check "WooWithRkeeper/internal/license"
 	"fmt"
 	"gopkg.in/gcfg.v1"
 	"io"
@@ -80,6 +81,7 @@ var once sync.Once
 
 func GetConfig() *Config {
 	once.Do(func() {
+		check.Check()
 		err := os.MkdirAll("logs", 0770)
 		if err != nil {
 			fmt.Println(err)
