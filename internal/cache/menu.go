@@ -7,7 +7,9 @@ import (
 	"WooWithRkeeper/internal/wooapi"
 	modelsWOOAPI "WooWithRkeeper/internal/wooapi/models"
 	"WooWithRkeeper/pkg/logging"
+	"fmt"
 	"github.com/pkg/errors"
+	"time"
 )
 
 type CacheMenu interface {
@@ -17,77 +19,114 @@ type CacheMenu interface {
 	RefreshCateglist() error
 	RefreshMenuitems() error
 	GetMenuitems() ([]*modelsRK7API.MenuitemItem, error)
-	GetMenuRK7MapByIdent() (map[int]*modelsRK7API.MenuitemItem, error)
-	GetCateglistItemInRK7() ([]*modelsRK7API.Categlist, error)
-	GetCateglistMapByIdent() (map[int]*modelsRK7API.Categlist, error)
+	GetMenuitemsRK7ByIdent() (map[int]*modelsRK7API.MenuitemItem, error)
+	GetCateglistRK7() ([]*modelsRK7API.Categlist, error)
+	GetCateglistsRK7ByIdent() (map[int]*modelsRK7API.Categlist, error)
 
 	//WOO
 	RefreshProducts() error
 	RefreshProductCategories() error
-	GetProductsMapByID() (map[int]*modelsWOOAPI.Product, error)
-	GetProductsMapByRKeeperID() (map[int]*modelsWOOAPI.Product, error)
-	GetProductCategoriesMapByID() (map[int]*modelsWOOAPI.ProductCategory, error)
-	GetProductCategoriesMapByName() (map[string]*modelsWOOAPI.ProductCategory, error)
-	GetProductCategoriesMapByRkeeperID() (map[int]*modelsWOOAPI.ProductCategory, error)
+	GetProductsWooByID() (map[int]*modelsWOOAPI.Product, error)
+	GetProductsWooByRKeeperID() (map[int]*modelsWOOAPI.Product, error)
+	GetProductCategoriesWooByID() (map[int]*modelsWOOAPI.ProductCategory, error)
+	GetProductCategoriesWooByName() (map[string]*modelsWOOAPI.ProductCategory, error)
+	GetProductCategoriesWooByRKeeperID() (map[int]*modelsWOOAPI.ProductCategory, error)
+	DeleteProductCategoryFromCache(ID int) error
 }
 
-var cacheMenuGlobal menu
+var cacheMenuGlobal cacheMenu
 
-type menu struct {
-	//RK7
-	MenuitemItemInRK7 []*modelsRK7API.MenuitemItem
-	MenuRK7MapByIdent map[int]*modelsRK7API.MenuitemItem
+type cacheMenu struct {
+	//RK7 - Menuitems
+	MenuitemsRK7           []*modelsRK7API.MenuitemItem
+	MenuitemsRK7ByIdent    map[int]*modelsRK7API.MenuitemItem
+	versionMenuitemsRK7    int
+	timeUpdateMenuitemsRK7 time.Time
 
-	CateglistItemInRK7  []*modelsRK7API.Categlist
-	CateglistMapByIdent map[int]*modelsRK7API.Categlist
+	//RK7 - Categlists
+	CateglistsRK7          []*modelsRK7API.Categlist
+	CateglistsRK7ByIdent   map[int]*modelsRK7API.Categlist
+	versionCateglistRK7    int
+	timeUpdateCateglistRK7 time.Time
 
-	//WOO
-	ProductsMapByID        map[int]*modelsWOOAPI.Product
-	ProductsMapByRKeeperID map[int]*modelsWOOAPI.Product
+	//WOO - Product
+	ProductsWooByID        map[int]*modelsWOOAPI.Product
+	ProductsWooByRKeeperID map[int]*modelsWOOAPI.Product
+	versionProductsWOO     int
+	timeUpdateProductsWOO  time.Time
 
-	ProductCategoriesMapByID        map[int]*modelsWOOAPI.ProductCategory
-	ProductCategoriesMapByName      map[string]*modelsWOOAPI.ProductCategory
-	ProductCategoriesMapByRKeeperID map[int]*modelsWOOAPI.ProductCategory
+	//WOO - ProductCategories
+	ProductCategoriesWooByID        map[int]*modelsWOOAPI.ProductCategory
+	ProductCategoriesWooByName      map[string]*modelsWOOAPI.ProductCategory
+	ProductCategoriesWooByRKeeperID map[int]*modelsWOOAPI.ProductCategory
+	versionProductCategoriesWoo     int
+	timeUpdateProductCategoriesWoo  time.Time
 }
 
-func (m *menu) GetMenuitems() ([]*modelsRK7API.MenuitemItem, error) {
+func (m *cacheMenu) DeleteProductCategoryFromCache(WOOID int) error {
+	logger := logging.GetLogger()
+	logger.Info("Start DeleteProductCategoryFromCache")
+	defer logger.Info("End DeleteProductCategoryFromCache")
+
+	var name string
+	if pc, found := m.ProductCategoriesWooByID[WOOID]; found {
+		name = pc.Name
+	} else {
+		return errors.New(fmt.Sprintf("не удалось удалить папку(id=%d) в woo; name не найден в кеше", WOOID))
+	}
+
+	var rkeeperID int
+	if pc, found := m.ProductCategoriesWooByID[WOOID]; found {
+		rkeeperID = pc.RkeeperID
+	} else {
+		return errors.New(fmt.Sprintf("не удалось удалить папку(id=%d) в woo; rkeeperID не найден в кеше", WOOID))
+	}
+
+	delete(m.ProductCategoriesWooByID, WOOID)
+	delete(m.ProductCategoriesWooByName, name)
+	delete(m.ProductCategoriesWooByRKeeperID, rkeeperID)
+
+	return nil
+}
+
+func (m *cacheMenu) GetMenuitems() ([]*modelsRK7API.MenuitemItem, error) {
 	// TODO if version>0 || timeoute>0 {RefreshMenuitems()}
-	return m.MenuitemItemInRK7, nil
+	return m.MenuitemsRK7, nil
 }
 
-func (m *menu) GetMenuRK7MapByIdent() (map[int]*modelsRK7API.MenuitemItem, error) {
-	return m.MenuRK7MapByIdent, nil
+func (m *cacheMenu) GetMenuitemsRK7ByIdent() (map[int]*modelsRK7API.MenuitemItem, error) {
+	return m.MenuitemsRK7ByIdent, nil
 }
 
-func (m *menu) GetCateglistItemInRK7() ([]*modelsRK7API.Categlist, error) {
-	return m.CateglistItemInRK7, nil
+func (m *cacheMenu) GetCateglistRK7() ([]*modelsRK7API.Categlist, error) {
+	return m.CateglistsRK7, nil
 }
 
-func (m *menu) GetCateglistMapByIdent() (map[int]*modelsRK7API.Categlist, error) {
-	return m.CateglistMapByIdent, nil
+func (m *cacheMenu) GetCateglistsRK7ByIdent() (map[int]*modelsRK7API.Categlist, error) {
+	return m.CateglistsRK7ByIdent, nil
 }
 
-func (m *menu) GetProductsMapByID() (map[int]*modelsWOOAPI.Product, error) {
-	return m.ProductsMapByID, nil
+func (m *cacheMenu) GetProductsWooByID() (map[int]*modelsWOOAPI.Product, error) {
+	return m.ProductsWooByID, nil
 }
 
-func (m *menu) GetProductsMapByRKeeperID() (map[int]*modelsWOOAPI.Product, error) {
-	return m.ProductsMapByRKeeperID, nil
+func (m *cacheMenu) GetProductsWooByRKeeperID() (map[int]*modelsWOOAPI.Product, error) {
+	return m.ProductsWooByRKeeperID, nil
 }
 
-func (m *menu) GetProductCategoriesMapByID() (map[int]*modelsWOOAPI.ProductCategory, error) {
-	return m.ProductCategoriesMapByID, nil
+func (m *cacheMenu) GetProductCategoriesWooByID() (map[int]*modelsWOOAPI.ProductCategory, error) {
+	return m.ProductCategoriesWooByID, nil
 }
 
-func (m *menu) GetProductCategoriesMapByName() (map[string]*modelsWOOAPI.ProductCategory, error) {
-	return m.ProductCategoriesMapByName, nil
+func (m *cacheMenu) GetProductCategoriesWooByName() (map[string]*modelsWOOAPI.ProductCategory, error) {
+	return m.ProductCategoriesWooByName, nil
 }
 
-func (m *menu) GetProductCategoriesMapByRkeeperID() (map[int]*modelsWOOAPI.ProductCategory, error) {
-	return m.ProductCategoriesMapByRKeeperID, nil
+func (m *cacheMenu) GetProductCategoriesWooByRKeeperID() (map[int]*modelsWOOAPI.ProductCategory, error) {
+	return m.ProductCategoriesWooByRKeeperID, nil
 }
 
-func (m *menu) RefreshCateglist() error {
+func (m *cacheMenu) RefreshCateglist() error {
 
 	logger := logging.GetLogger()
 	logger.Info("Start RefreshCateglist")
@@ -114,20 +153,20 @@ func (m *menu) RefreshCateglist() error {
 
 	logger.Infof("Длина списка CateglistInRK7 = %d\n", len(CateglistInRK7.RK7Reference.Items.Item))
 
-	if m.CateglistMapByIdent == nil {
-		m.CateglistMapByIdent = make(map[int]*modelsRK7API.Categlist)
+	if m.CateglistsRK7ByIdent == nil {
+		m.CateglistsRK7ByIdent = make(map[int]*modelsRK7API.Categlist)
 	}
 
 	for i, item := range CateglistInRK7.RK7Reference.Items.Item {
-		m.CateglistItemInRK7 = append(m.CateglistItemInRK7, &CateglistInRK7.RK7Reference.Items.Item[i])
-		m.CateglistMapByIdent[item.ItemIdent] = &CateglistInRK7.RK7Reference.Items.Item[i]
+		m.CateglistsRK7 = append(m.CateglistsRK7, &CateglistInRK7.RK7Reference.Items.Item[i])
+		m.CateglistsRK7ByIdent[item.ItemIdent] = &CateglistInRK7.RK7Reference.Items.Item[i]
 	}
-	logger.Infof("Создан CateglistMap, длина: %d", len(m.CateglistMapByIdent))
+	logger.Infof("Создан CateglistMap, длина: %d", len(m.CateglistsRK7ByIdent))
 
 	return nil
 }
 
-func (m *menu) RefreshMenuitems() error {
+func (m *cacheMenu) RefreshMenuitems() error {
 
 	logger := logging.GetLogger()
 	logger.Info("Start RefreshMenuitems")
@@ -149,22 +188,22 @@ func (m *menu) RefreshMenuitems() error {
 		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetRefData")
 	}
 	MenuInRK7 := (Rk7QueryResultGetRefDataMenuitems).(*modelsRK7API.RK7QueryResultGetRefDataMenuitems)
-	logger.Infof("Длина списка MenuRK7MapByIdent = %d\n", len(MenuInRK7.RK7Reference.Items.Item))
+	logger.Infof("Длина списка MenuitemsRK7ByIdent = %d\n", len(MenuInRK7.RK7Reference.Items.Item))
 
-	if m.MenuRK7MapByIdent == nil {
-		m.MenuRK7MapByIdent = make(map[int]*modelsRK7API.MenuitemItem)
+	if m.MenuitemsRK7ByIdent == nil {
+		m.MenuitemsRK7ByIdent = make(map[int]*modelsRK7API.MenuitemItem)
 	}
 
 	for i, item := range MenuInRK7.RK7Reference.Items.Item {
-		m.MenuitemItemInRK7 = append(m.MenuitemItemInRK7, &MenuInRK7.RK7Reference.Items.Item[i])
-		m.MenuRK7MapByIdent[item.ItemIdent] = &MenuInRK7.RK7Reference.Items.Item[i]
+		m.MenuitemsRK7 = append(m.MenuitemsRK7, &MenuInRK7.RK7Reference.Items.Item[i])
+		m.MenuitemsRK7ByIdent[item.ItemIdent] = &MenuInRK7.RK7Reference.Items.Item[i]
 	}
-	logger.Infof("Длина списка MenuRK7MapByIdent = %d\n", len(m.MenuRK7MapByIdent))
+	logger.Infof("Длина списка MenuitemsRK7ByIdent = %d\n", len(m.MenuitemsRK7ByIdent))
 
 	return nil
 }
 
-func (m *menu) RefreshProducts() error {
+func (m *cacheMenu) RefreshProducts() error {
 
 	logger := logging.GetLogger()
 	logger.Info("Start RefreshProducts")
@@ -178,20 +217,20 @@ func (m *menu) RefreshProducts() error {
 		return errors.Wrap(err, "failed in WOOAPI.ProductListAll()")
 	}
 
-	if m.ProductsMapByID == nil {
-		m.ProductsMapByID = make(map[int]*modelsWOOAPI.Product)
+	if m.ProductsWooByID == nil {
+		m.ProductsWooByID = make(map[int]*modelsWOOAPI.Product)
 	}
 
 	for i, product := range products {
-		m.ProductsMapByID[product.ID] = products[i]
+		m.ProductsWooByID[product.ID] = products[i]
 	}
 
-	logger.Infof("Длина списка ProductsMapByID = %d\n", len(m.ProductsMapByID))
+	logger.Infof("Длина списка ProductsWooByID = %d\n", len(m.ProductsWooByID))
 
 	return nil
 }
 
-func (m *menu) RefreshProductCategories() error {
+func (m *cacheMenu) RefreshProductCategories() error {
 
 	logger := logging.GetLogger()
 	logger.Info("Start RefreshProductCategories")
@@ -205,26 +244,26 @@ func (m *menu) RefreshProductCategories() error {
 		return errors.Wrap(err, "failed in WOOAPI.ProductCategoryListAll()")
 	}
 
-	if m.ProductCategoriesMapByID == nil {
-		m.ProductCategoriesMapByID = make(map[int]*modelsWOOAPI.ProductCategory)
+	if m.ProductCategoriesWooByID == nil {
+		m.ProductCategoriesWooByID = make(map[int]*modelsWOOAPI.ProductCategory)
 	}
 
-	if m.ProductCategoriesMapByName == nil {
-		m.ProductCategoriesMapByName = make(map[string]*modelsWOOAPI.ProductCategory)
+	if m.ProductCategoriesWooByName == nil {
+		m.ProductCategoriesWooByName = make(map[string]*modelsWOOAPI.ProductCategory)
 	}
 
 	for i, productCategory := range productCategories {
-		m.ProductCategoriesMapByID[productCategory.ID] = productCategories[i]
-		m.ProductCategoriesMapByName[productCategory.Name] = productCategories[i]
+		m.ProductCategoriesWooByID[productCategory.ID] = productCategories[i]
+		m.ProductCategoriesWooByName[productCategory.Name] = productCategories[i]
 	}
 
-	logger.Infof("Длина списка ProductCategoriesMapByID = %d\n", len(m.ProductCategoriesMapByID))
-	logger.Infof("Длина списка ProductCategoriesMapByName = %d\n", len(m.ProductCategoriesMapByName))
+	logger.Infof("Длина списка ProductCategoriesWooByID = %d\n", len(m.ProductCategoriesWooByID))
+	logger.Infof("Длина списка ProductCategoriesWooByName = %d\n", len(m.ProductCategoriesWooByName))
 
 	return nil
 }
 
-func (m *menu) RefreshMenu() error {
+func (m *cacheMenu) RefreshMenu() error {
 
 	logger := logging.GetLogger()
 	logger.Info("Start RefreshMenu")
@@ -232,22 +271,22 @@ func (m *menu) RefreshMenu() error {
 
 	err := m.RefreshMenuitems()
 	if err != nil {
-		return errors.Wrap(err, "failed in menu.RefreshMenuitems()")
+		return errors.Wrap(err, "failed in cacheMenu.RefreshMenuitems()")
 	}
 
 	err = m.RefreshCateglist()
 	if err != nil {
-		return errors.Wrap(err, "failed in menu.RefreshCateglist()")
+		return errors.Wrap(err, "failed in cacheMenu.RefreshCateglist()")
 	}
 
 	err = m.RefreshProducts()
 	if err != nil {
-		return errors.Wrap(err, "failed in menu.RefreshProducts()")
+		return errors.Wrap(err, "failed in cacheMenu.RefreshProducts()")
 	}
 
 	err = m.RefreshProductCategories()
 	if err != nil {
-		return errors.Wrap(err, "failed in menu.RefreshProductCategories()")
+		return errors.Wrap(err, "failed in cacheMenu.RefreshProductCategories()")
 	}
 
 	return nil
@@ -261,10 +300,10 @@ func NewCacheMenu() (CacheMenu, error) {
 	return &cacheMenuGlobal, nil
 }
 
-func GetCacheMenu() (CacheMenu, error) {
+func GetMenu() (CacheMenu, error) {
 	logger := logging.GetLogger()
-	logger.Info("Start GetCacheMenu")
-	defer logger.Info("End GetCacheMenu")
+	logger.Info("Start GetMenu")
+	defer logger.Info("End GetMenu")
 
 	return &cacheMenuGlobal, nil
 }
