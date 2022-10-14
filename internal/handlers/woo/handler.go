@@ -184,6 +184,8 @@ type WebhookCreatOrderOld struct {
 	} `json:"billing"`
 }
 
+type m []map[string]interface{}
+
 func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 	logger := logging.GetLogger()
@@ -315,20 +317,73 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 			fmt.Println("WebhookCreatOrder.LineItems[0].MetaData", WebhookCreatOrder.LineItems[0].MetaData)
 
-			dateTimeStart, err := time.Parse("2006-01-02 15:04:05.000000", WebhookCreatOrder.LineItems[0].MetaData[0].Value.Start.Date)
-			if err != nil {
-				return errors.Wrapf(err, "Не удалось распарсить время в поле WebhookCreatOrder.LineItems[0].MetaData[0].Value.Start.Date=%s", WebhookCreatOrder.LineItems[0].MetaData[0].Value.Start.Date)
-			}
-			dateTimeEnd, err := time.Parse("2006-01-02 15:04:05.000000", WebhookCreatOrder.LineItems[0].MetaData[0].Value.End.Date)
-			if err != nil {
-				return errors.Wrapf(err, "Не удалось распарсить время в поле WebhookCreatOrder.LineItems[0].MetaData[0].Value.End.Date=%s", WebhookCreatOrder.LineItems[0].MetaData[0].Value.End.Date)
+			values := WebhookCreatOrder.LineItems[0].MetaData[0].Values
+
+			var durationInt int
+			//получаем valuesMap
+			if valuesMap, ok := values.(map[string]interface{}); ok {
+
+				//проверяем наличие Start
+				if start, ok := valuesMap["Start"]; ok {
+					//проверяем, что привидение типа работает
+					if startMap, ok := start.(map[string]interface{}); ok {
+						//проверяем наличие Date
+						if startDate, ok := startMap["Date"]; ok {
+							//проверяем, что привидение типа работает
+							if startDateString, ok := startDate.(string); ok {
+								//парсим из строки время
+								dateTimeStart, err := time.Parse("2006-01-02 15:04:05.000000", startDateString)
+								if err != nil {
+									return errors.Wrapf(err, "Не удалось распарсить время в поле WebhookCreatOrder.LineItems[0].MetaData[0].Value.Start.Date=%s", dateTimeStart)
+								}
+								DateStart = dateTimeStart.Format("2006-01-02") // Props - DateStart - Дата бронирования
+								DateTimeStart = dateTimeStart.Format("2006-01-02T15:04:05")
+								TimeStart = dateTimeStart.Format("15:04:05") // Props - TimeStart - Время начала пользования залом
+							}
+						}
+					}
+				}
+
+				//проверяем наличие End
+				if end, ok := valuesMap["End"]; ok {
+					//проверяем, что привидение типа работает
+					if endMap, ok := end.(map[string]interface{}); ok {
+						//проверяем наличие Date
+						if endDate, ok := endMap["Date"]; ok {
+							//проверяем, что привидение типа работает
+							if endDateString, ok := endDate.(string); ok {
+								//парсим из строки время
+								dateTimeEnd, err := time.Parse("2006-01-02 15:04:05.000000", endDateString)
+								if err != nil {
+									return errors.Wrapf(err, "Не удалось распарсить время в поле WebhookCreatOrder.LineItems[0].MetaData[0].Value.End.Date=%s", dateTimeEnd)
+								}
+								TimeEnd = dateTimeEnd.Format("15:04:05") // Props - TimeEnd - Время окончания пользования залом
+							}
+						}
+					}
+				}
+
+				//проверяем наличие Persons
+				if persons, ok := valuesMap["Persons"]; ok {
+					//проверяем, что привидение типа работает
+					if personsString, ok := persons.(string); ok {
+						Persons = personsString // Props - Persons - Кол-во гостей
+					}
+				}
+
+				//проверяем наличие Duration
+				if duration, ok := valuesMap["Duration"]; ok {
+					//проверяем, что привидение типа работает
+					if durationString, ok := duration.(string); ok {
+						Duration = durationString // Props - Persons - Кол-во гостей
+						durationInt, err = strconv.Atoi(Duration)
+						if err != nil {
+							return errors.Wrapf(err, "Не удалось распарсить продолжительность брони Duration=%s", Duration)
+						}
+					}
+				}
 			}
 
-			DateStart = dateTimeStart.Format("2006-01-02") // Props - DateStart - Дата бронирования
-			DateTimeStart = dateTimeStart.Format("2006-01-02T15:04:05")
-			TimeStart = dateTimeStart.Format("15:04:05")                       // Props - TimeStart - Время начала пользования залом
-			TimeEnd = dateTimeEnd.Format("15:04:05")                           // Props - TimeEnd - Время окончания пользования залом
-			Persons = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Persons // Props - Persons - Кол-во гостей
 			//PersonType = WebhookCreatOrder.LineItems[0].MetaData[0].Value.PersonType                     // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
 			PersonType = ""
 			//CompanyDetails = fmt.Sprint(WebhookCreatOrder.LineItems[0].MetaData[0].Value.CompanyDetails) // Props - CompanyDetails - Реквизиты Юр.лица (если выбрано Юр.лицо)
@@ -337,11 +392,6 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 			Comment = ""
 
 			durationTime := time.Date(1899, 12, 30, 0, 0, 0, 0, time.UTC)
-			Duration = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Duration
-			durationInt, err := strconv.Atoi(Duration)
-			if err != nil {
-				return errors.Wrapf(err, "Не удалось распарсить продолжительность брони Duration=%s", Duration)
-			}
 
 			DurationRK = durationTime.Add(time.Hour * time.Duration(durationInt)).Format("2006-01-02T15:04:05")
 			//duration="1899-12-30T04:00:00"
@@ -379,19 +429,24 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 				Value: Comment, // TODO TEST
 			})
 
-			for _, dish := range WebhookCreatOrder.LineItems[0].MetaData[0].Value.Resources {
-				name := fmt.Sprint(dish.Name)
-				price := fmt.Sprint(dish.Price)
-				dishsNotation = append(dishsNotation, fmt.Sprintf("%s (%s руб)", name, price))
-			}
-
+			/*
+				for _, dish := range WebhookCreatOrder.LineItems[0].MetaData[0].Value.Resources {
+					name := fmt.Sprint(dish.Name)
+					price := fmt.Sprint(dish.Price)
+					dishsNotation = append(dishsNotation, fmt.Sprintf("%s (%s руб)", name, price))
+				}
+			*/
 			//TODO сделать проверки, что объект существует
 			//TODO сделать проверки, что поле "key":"_mvvwb_order_item_key_costs", "display_key":"_mvvwb_order_item_key_costs",
-			for _, item := range WebhookCreatOrder.LineItems[0].MetaData[1].Value.Items {
-				label := fmt.Sprint(item.Label)
-				price := fmt.Sprint(item.Price)
-				servicesNotation = append(servicesNotation, fmt.Sprintf("%s (%s руб)", label, price))
-			}
+			//TODO FUCK!
+			/*
+				for _, item := range WebhookCreatOrder.LineItems[0].MetaData[1].Value.Items {
+					label := fmt.Sprint(item.Label)
+					price := fmt.Sprint(item.Price)
+					servicesNotation = append(servicesNotation, fmt.Sprintf("%s (%s руб)", label, price))
+				}
+
+			*/
 		}
 	}
 
