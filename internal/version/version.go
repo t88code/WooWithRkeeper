@@ -4,7 +4,7 @@ import "fmt"
 
 const VERSION_MAJOR = 1
 const VERSION_MINOR = 1
-const VERISON_MICRO = 1
+const VERISON_MICRO = 4
 
 var version *Version
 

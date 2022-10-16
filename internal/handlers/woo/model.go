@@ -74,7 +74,7 @@ type WebhookCreatOrder struct {
 		MetaData    []struct {
 			Id           int         `json:"id"`
 			Key          string      `json:"key"`
-			Values       interface{} `json:"value"` //-
+			Values       values      `json:"value"` //-
 			DisplayKey   string      `json:"display_key"`
 			DisplayValue interface{} `json:"display_value"`
 		} `json:"meta_data"`
@@ -127,6 +127,8 @@ type WebhookCreatOrder struct {
 		} `json:"customer"`
 	} `json:"_links"`
 }
+
+type values interface{}
 
 type value struct {
 	Duration  string `json:"duration,omitempty"`  //+

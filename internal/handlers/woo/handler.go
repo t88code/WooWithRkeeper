@@ -314,21 +314,16 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 		})
 
 		if len(WebhookCreatOrder.LineItems[0].MetaData) >= 2 {
-
-			fmt.Println("WebhookCreatOrder.LineItems[0].MetaData", WebhookCreatOrder.LineItems[0].MetaData)
-
 			values := WebhookCreatOrder.LineItems[0].MetaData[0].Values
-
 			var durationInt int
 			//получаем valuesMap
 			if valuesMap, ok := values.(map[string]interface{}); ok {
-
 				//проверяем наличие Start
-				if start, ok := valuesMap["Start"]; ok {
+				if start, ok := valuesMap["start"]; ok {
 					//проверяем, что привидение типа работает
 					if startMap, ok := start.(map[string]interface{}); ok {
 						//проверяем наличие Date
-						if startDate, ok := startMap["Date"]; ok {
+						if startDate, ok := startMap["date"]; ok {
 							//проверяем, что привидение типа работает
 							if startDateString, ok := startDate.(string); ok {
 								//парсим из строки время
@@ -343,13 +338,12 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 						}
 					}
 				}
-
 				//проверяем наличие End
-				if end, ok := valuesMap["End"]; ok {
+				if end, ok := valuesMap["end"]; ok {
 					//проверяем, что привидение типа работает
 					if endMap, ok := end.(map[string]interface{}); ok {
 						//проверяем наличие Date
-						if endDate, ok := endMap["Date"]; ok {
+						if endDate, ok := endMap["date"]; ok {
 							//проверяем, что привидение типа работает
 							if endDateString, ok := endDate.(string); ok {
 								//парсим из строки время
@@ -362,17 +356,15 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 						}
 					}
 				}
-
 				//проверяем наличие Persons
-				if persons, ok := valuesMap["Persons"]; ok {
+				if persons, ok := valuesMap["persons"]; ok {
 					//проверяем, что привидение типа работает
 					if personsString, ok := persons.(string); ok {
 						Persons = personsString // Props - Persons - Кол-во гостей
 					}
 				}
-
 				//проверяем наличие Duration
-				if duration, ok := valuesMap["Duration"]; ok {
+				if duration, ok := valuesMap["duration"]; ok {
 					//проверяем, что привидение типа работает
 					if durationString, ok := duration.(string); ok {
 						Duration = durationString // Props - Persons - Кол-во гостей
@@ -514,6 +506,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 	var order *modelsRK7API.Order
 	//отправить CreateOrder
+	panic(23)
 	resultCreateOrder, err := RK7API.CreateOrder(Order)
 	if err != nil {
 		logger.Infof("Ошибка при создании заказа RK, error: %v", err)
