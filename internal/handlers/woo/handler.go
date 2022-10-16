@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -566,7 +565,6 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var order *modelsRK7API.Order
 	//отправить CreateOrder
 
-	os.Exit(1)
 	resultCreateOrder, err := RK7API.CreateOrder(Order)
 	if err != nil {
 		logger.Infof("Ошибка при создании заказа RK, error: %v", err)
