@@ -506,7 +506,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 	var order *modelsRK7API.Order
 	//отправить CreateOrder
-	panic(23)
+
 	resultCreateOrder, err := RK7API.CreateOrder(Order)
 	if err != nil {
 		logger.Infof("Ошибка при создании заказа RK, error: %v", err)
