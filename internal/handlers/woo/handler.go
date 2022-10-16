@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -243,7 +244,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var DurationRK string                                                  //duration="1899-12-30T04:00:00"
 	var Deposit int                                                        // "10000"
 
-	var servicesNotation, dishsNotation []string
+	var servicesNotation, dishsNotation, totalNotation []string
 	//Банкетное меню lite (25000 ₽), Каскад из шампанского (10000 ₽), Ковровая дорожка (3000 ₽)
 	//Booking #3049 Unpaid
 	//28.07.2022
@@ -270,10 +271,18 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 		Name:  "Phone",
 		Value: Phone,
 	})
-	Props = append(Props, &modelsRK7API.Prop{
-		Name:  "PersonName",
-		Value: PersonName,
-	})
+	if CompanyName == "" {
+		Props = append(Props, &modelsRK7API.Prop{
+			Name:  "PersonName",
+			Value: PersonName,
+		})
+	} else {
+		Props = append(Props, &modelsRK7API.Prop{
+			Name:  "PersonName",
+			Value: CompanyName,
+		})
+	}
+
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "LastName",
 		Value: LastName,
@@ -374,6 +383,51 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 						}
 					}
 				}
+				//проверяем наличие доп услуг resources todo не факт
+				if resources, ok := valuesMap["resources"]; ok {
+					if resourcesSlice, ok := resources.([]interface{}); ok {
+						for _, resourcesLine := range resourcesSlice {
+							if r, ok := resourcesLine.(map[string]interface{}); ok {
+								switch v := r["price"].(type) {
+								case int:
+									servicesNotation = append(servicesNotation, fmt.Sprintf("%s(%d руб)", r["name"], v))
+								case float64:
+									servicesNotation = append(servicesNotation, fmt.Sprintf("%s(%.0f руб)", r["name"], v))
+								case string:
+									servicesNotation = append(servicesNotation, fmt.Sprintf("%s(%s руб)", r["name"], v))
+								default:
+									servicesNotation = append(servicesNotation, fmt.Sprint(r["name"], "(", v, "руб)"))
+								}
+
+							}
+						}
+					}
+				}
+			}
+
+			values = WebhookCreatOrder.LineItems[0].MetaData[1].Values
+			//получаем valuesMap
+			if valuesMap, ok := values.(map[string]interface{}); ok {
+				//проверяем наличие услуг resources todo не факт
+				if items, ok := valuesMap["items"]; ok {
+					if itemsSlice, ok := items.([]interface{}); ok {
+						for _, itemsLine := range itemsSlice {
+							if r, ok := itemsLine.(map[string]interface{}); ok {
+								switch v := r["price"].(type) {
+								case int:
+									totalNotation = append(totalNotation, fmt.Sprintf("%s(%d руб)", r["label"], v))
+								case float64:
+									totalNotation = append(totalNotation, fmt.Sprintf("%s(%.0f руб)", r["label"], v))
+								case string:
+									totalNotation = append(totalNotation, fmt.Sprintf("%s(%s руб)", r["label"], v))
+								default:
+									totalNotation = append(totalNotation, fmt.Sprint(r["label"], "(", v, "руб)"))
+								}
+
+							}
+						}
+					}
+				}
 			}
 
 			//PersonType = WebhookCreatOrder.LineItems[0].MetaData[0].Value.PersonType                     // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
@@ -440,6 +494,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 			*/
 		}
+
 	}
 
 	statusPayed := "Unpaid" //TODO statusPayed
@@ -454,12 +509,16 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	Notation = append(Notation, servicesNotation...)
 	//Стоимость бронирования (24000 ₽)
 	//Стоимость услуг (38000 ₽)
-	Notation = append(Notation, fmt.Sprintf("Итоговая стоимость %s", OrderSum))
-	Notation = append(Notation, "Дополнительные услуги:")
-	Notation = append(Notation, dishsNotation...)
+	if len(dishsNotation) > 0 {
+		Notation = append(Notation, "Дополнительные услуги:")
+		Notation = append(Notation, dishsNotation...)
+	}
 	//Банкетное меню lite (25000 ₽)
 	//Каскад из шампанского (10000 ₽)
 	//Ковровая дорожка (3000 ₽)
+	Notation = append(Notation, "Итого:")
+	Notation = append(Notation, totalNotation...)
+	Notation = append(Notation, fmt.Sprintf("Итоговая стоимость(%s руб)", OrderSum))
 
 	OrderDetails = strings.Join(Notation, "\r\n") // Props - OrderDetails - Дополнительные параметры к заказу
 
@@ -507,6 +566,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var order *modelsRK7API.Order
 	//отправить CreateOrder
 
+	os.Exit(1)
 	resultCreateOrder, err := RK7API.CreateOrder(Order)
 	if err != nil {
 		logger.Infof("Ошибка при создании заказа RK, error: %v", err)
