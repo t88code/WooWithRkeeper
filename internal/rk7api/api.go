@@ -39,20 +39,26 @@ type RK7API interface {
 	GetXMLLicenseInstanceSeqNumber(Anchor, LicenseToken, Guid string) (*models.RK7QueryResultGetXMLLicenseInstanceSeqNumber, error)
 }
 
+var rk7apiGlobal *rk7api
+
 type rk7api struct {
-	url    string
-	user   string
-	pass   string
-	xmlApi *xmlInterface
+	url     string
+	user    string
+	pass    string
+	xmlType int
+	xmlApi  *xmlInterface
 }
 
 func (r *rk7api) GetXMLLicenseInstanceSeqNumber(Anchor, LicenseToken, Guid string) (*models.RK7QueryResultGetXMLLicenseInstanceSeqNumber, error) {
 
 	RK7QueryGetXMLLicenseInstanceSeqNumber := new(models.RK7QueryGetXMLLicenseInstanceSeqNumber)
 	RK7QueryGetXMLLicenseInstanceSeqNumber.RK7CMD.CMD = "GetXMLLicenseInstanceSeqNumber"
-	RK7QueryGetXMLLicenseInstanceSeqNumber.RK7CMD.LicenseInfo.Anchor = Anchor
-	RK7QueryGetXMLLicenseInstanceSeqNumber.RK7CMD.LicenseInfo.LicenseToken = LicenseToken
-	RK7QueryGetXMLLicenseInstanceSeqNumber.RK7CMD.LicenseInfo.LicenseInstance.Guid = Guid
+	LicenseInfo := new(models.LicenseInfoGetXMLLicenseInstanceSeqNumber)
+	LicenseInfo.Anchor = Anchor
+	LicenseInfo.LicenseToken = LicenseToken
+	LicenseInfo.LicenseInstance.Guid = Guid
+
+	RK7QueryGetXMLLicenseInstanceSeqNumber.RK7CMD.LicenseInfo = LicenseInfo
 
 	xmlQuery, err := xml.MarshalIndent(RK7QueryGetXMLLicenseInstanceSeqNumber, "  ", "    ")
 	if err != nil {
@@ -237,19 +243,9 @@ func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs *[]mod
 	RK7QuerySaveOrder.RK7CMD.Session.Dish = Dishs
 	RK7QuerySaveOrder.RK7CMD.Session.Prepay = Prepay
 
-	xmlInterface, err := GetXmlInterface()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed GetXmlInterface()")
-	}
-
-	RK7QuerySaveOrder.RK7CMD.LicenseInfo.Anchor = xmlInterface.Anchor
-	RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseToken = xmlInterface.Id
-	RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseInstance.Guid = xmlInterface.Guid
-
 	RK7QueryResultSaveOrder := new(models.RK7QueryResultSaveOrder)
-	indexRequestNumber := 1 // это чтобы не повторять каждый раз запрос и когда indexRequestNumber++ то будет выход из цикла
-	for {
-		RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseInstance.SeqNumber = xmlInterface.SeqNumber
+	switch r.xmlType {
+	case 1:
 		xmlQuery, err := xml.MarshalIndent(RK7QuerySaveOrder, "  ", "    ")
 		if err != nil {
 			return nil, errors.Wrap(err, "failed Marshal in func RK7QuerySaveOrder")
@@ -267,27 +263,63 @@ func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs *[]mod
 		if RK7QueryResultSaveOrder.XMLName.Local != `RK7QueryResult` {
 			return nil, errors.New("Ошибка в Response RK7API.SaveOrder. RK7QueryResult not found")
 		}
-
 		if RK7QueryResultSaveOrder.Status != "Ok" {
-			if (RK7QueryResultSaveOrder.ErrorText == ERROR_TEXT_5310 ||
-				RK7QueryResultSaveOrder.ErrorText == ERROS_TEXT_5305 ||
-				RK7QueryResultSaveOrder.RK7ErrorN == ERROS_NUMBER_5305) &&
-				indexRequestNumber <= 1 {
-				logger.Info("Получаем SeqNumber")
-				RK7QueryResultGetXMLLicenseInstanceSeqNumber, err := r.GetXMLLicenseInstanceSeqNumber(xmlInterface.Anchor, xmlInterface.Id, xmlInterface.Guid)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed GetXMLLicenseInstanceSeqNumber")
-				}
-				xmlInterface.SeqNumber = RK7QueryResultGetXMLLicenseInstanceSeqNumber.LicenseInfo.LicenseInstance.SeqNumber + 1
-				indexRequestNumber++
-				logger.Info("Повторная отправка")
-				continue
-			}
 			return nil, errors.New(fmt.Sprintf("Ошибка в Response RK7API.SaveOrder:>%s.%s", RK7QueryResultSaveOrder.Status, RK7QueryResultSaveOrder.ErrorText))
 		}
-		break
+	case 2:
+		xmlInterface, err := GetXmlInterface()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed GetXmlInterface()")
+		}
+
+		RK7QuerySaveOrder.RK7CMD.LicenseInfo.Anchor = xmlInterface.Anchor
+		RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseToken = xmlInterface.Id
+		RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseInstance.Guid = xmlInterface.Guid
+		indexRequestNumber := 1 // это чтобы не повторять каждый раз запрос и когда indexRequestNumber++ то будет выход из цикла
+		for {
+			RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseInstance.SeqNumber = xmlInterface.SeqNumber
+			xmlQuery, err := xml.MarshalIndent(RK7QuerySaveOrder, "  ", "    ")
+			if err != nil {
+				return nil, errors.Wrap(err, "failed Marshal in func RK7QuerySaveOrder")
+			}
+
+			xmlResponse, err := Send(r.url, r.user, r.pass, xmlQuery)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed in func SendToXML")
+			}
+
+			err = xml.Unmarshal(xmlResponse, RK7QueryResultSaveOrder)
+			if err != nil {
+				return nil, errors.Wrap(err, "Не удалось выполнить Unmarshal")
+			}
+			if RK7QueryResultSaveOrder.XMLName.Local != `RK7QueryResult` {
+				return nil, errors.New("Ошибка в Response RK7API.SaveOrder. RK7QueryResult not found")
+			}
+
+			if RK7QueryResultSaveOrder.Status != "Ok" {
+				if (RK7QueryResultSaveOrder.ErrorText == ERROR_TEXT_5310 ||
+					RK7QueryResultSaveOrder.ErrorText == ERROS_TEXT_5305 ||
+					RK7QueryResultSaveOrder.RK7ErrorN == ERROS_NUMBER_5305) &&
+					indexRequestNumber <= 1 {
+					logger.Info("Получаем SeqNumber")
+					RK7QueryResultGetXMLLicenseInstanceSeqNumber, err := r.GetXMLLicenseInstanceSeqNumber(xmlInterface.Anchor, xmlInterface.Id, xmlInterface.Guid)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed GetXMLLicenseInstanceSeqNumber")
+					}
+					xmlInterface.SeqNumber = RK7QueryResultGetXMLLicenseInstanceSeqNumber.LicenseInfo.LicenseInstance.SeqNumber + 1
+					indexRequestNumber++
+					logger.Info("Повторная отправка")
+					continue
+				}
+				return nil, errors.New(fmt.Sprintf("Ошибка в Response RK7API.SaveOrder:>%s.%s", RK7QueryResultSaveOrder.Status, RK7QueryResultSaveOrder.ErrorText))
+			}
+			break
+		}
+		xmlInterface.SeqNumber++
+	default:
+		return nil, errors.New(fmt.Sprintf("не удалось определить xmlType=%d", r.xmlType))
 	}
-	xmlInterface.SeqNumber++
+
 	return RK7QueryResultSaveOrder, nil
 }
 
@@ -495,35 +527,57 @@ func Send(url, user, pass string, data []byte) (respBody []byte, e error) {
 	logger.Debugf("SendToApiRk7.Response.Status:>%s", resp.Status)
 	logger.Debugf("SendToApiRk7.Response.Header:>%s", resp.Header)
 
-	respBody, err = ioutil.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		logger.Infof("SendToApiRk7.ioutil.ReadAll.ErrorBX24:>%s", err)
-		return nil, fmt.Errorf("SendToApiRk7.ioutil.ReadAll.ErrorBX24:>%s", err)
-	}
-	logger.Debugf("SendToApiRk7.Response:>\n%s", respBody)
+	if resp.StatusCode == http.StatusUnauthorized {
+		logger.Error("Ошибка авторизация при обращении к API RK7")
+		return nil, errors.New("Ошибка авторизация при обращении к API RK7")
+	} else {
+		respBody, err = ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			logger.Infof("SendToApiRk7.ioutil.ReadAll.ErrorBX24:>%s", err)
+			return nil, fmt.Errorf("SendToApiRk7.ioutil.ReadAll.ErrorBX24:>%s", err)
+		}
+		logger.Debugf("SendToApiRk7.Response:>\n%s", respBody)
 
-	return respBody, nil
+		return respBody, nil
+	}
 }
 
 func NewAPI(url string, user string, pass string) (RK7API, error) {
 
+	var err error
 	cfg := config.GetConfig()
+	xmlApi := new(xmlInterface)
 
-	xmlApi, err := NewXmlInterface(cfg.XMLINTERFACE.UserName,
-		cfg.XMLINTERFACE.Password,
-		cfg.XMLINTERFACE.Token,
-		cfg.XMLINTERFACE.ProductID,
-		cfg.XMLINTERFACE.GUID,
-		cfg.XMLINTERFACE.RestCode,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed NewXmlInterface")
+	switch cfg.XMLINTERFACE.Type {
+	case 1:
+		xmlApi = nil
+	case 2:
+		xmlApi, err = NewXmlInterface(cfg.XMLINTERFACE.UserName,
+			cfg.XMLINTERFACE.Password,
+			cfg.XMLINTERFACE.Token,
+			cfg.XMLINTERFACE.ProductID,
+			cfg.XMLINTERFACE.Guid,
+			cfg.XMLINTERFACE.RestCode,
+			cfg.XMLINTERFACE.URL,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed NewXmlInterface")
+		}
+	default:
+		return nil, errors.New(fmt.Sprintf("не удалось определить cfg.XMLINTERFACE.Type=%d", cfg.XMLINTERFACE.Type))
 	}
-	return &rk7api{
-		url:    url,
-		user:   user,
-		pass:   pass,
-		xmlApi: xmlApi,
-	}, nil
+
+	rk7apiGlobal = &rk7api{
+		url:     url,
+		user:    user,
+		pass:    pass,
+		xmlType: cfg.XMLINTERFACE.Type,
+		xmlApi:  xmlApi,
+	}
+	return rk7apiGlobal, nil
+}
+
+func GetAPI() RK7API {
+	return rk7apiGlobal
 }

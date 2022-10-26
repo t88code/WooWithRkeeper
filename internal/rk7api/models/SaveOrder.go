@@ -18,7 +18,7 @@ type RK7QuerySaveOrder struct {
 			Prepay  *Prepay `xml:"Prepay"`
 		} `xml:"Session"`
 
-		LicenseInfo LicenseInfo `xml:"LicenseInfo"`
+		LicenseInfo *LicenseInfo `xml:"LicenseInfo"`
 	} `xml:"RK7CMD"`
 }
 

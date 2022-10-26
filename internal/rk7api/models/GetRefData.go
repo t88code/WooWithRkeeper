@@ -33,7 +33,7 @@ type RK7QueryResultGetRefDataMenuitems struct {
 		ClassName    string `xml:"ClassName,attr"`
 		RIChildItems string `xml:"RIChildItems"`
 		Items        struct {
-			Item []MenuitemItem
+			Item []*MenuitemItem
 		} `xml:"Items"`
 	} `xml:"RK7Reference"`
 }
@@ -54,7 +54,7 @@ type RK7QueryResultGetRefDataCateglist struct {
 		ClassName    string `xml:"ClassName,attr"`
 		RIChildItems string `xml:"RIChildItems"`
 		Items        struct {
-			Item []Categlist
+			Item []*Categlist
 		} `xml:"Items"`
 	} `xml:"RK7Reference"`
 }

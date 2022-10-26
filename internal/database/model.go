@@ -50,7 +50,7 @@ CREATE TABLE MenuRK7 (
 	Ident integer,
 	Code integer,
 	Name text,
-	Price integer,
+	RegularPrice integer,
 	MainParentIdent integer,
 	Status integer,
 	ID_BX24 integer
@@ -59,7 +59,7 @@ CREATE TABLE MenuRK7 (
 CREATE TABLE MenuBX24 (
 	ID integer PRIMARY KEY AUTOINCREMENT,
 	Name text,
-	Price integer
+	RegularPrice integer
 );
 
 CREATE TABLE CateglistRK7 (

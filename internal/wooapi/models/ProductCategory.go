@@ -11,7 +11,6 @@ type ProductCategory struct {
 	MenuOrder   int    `json:"menu_order,omitempty"`
 	Count       int    `json:"count,omitempty"`
 	Links       *Links
-	RkeeperID   int `json:"rkeeperID,omitempty"`
 }
 
 type Image struct {

@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-const LSAPI_UCS_URL = "https://l.ucs.ru/ls5api/api/License/"
-
 type xmlInterface struct {
 	Usr                      string
 	Anchor                   string
@@ -25,6 +23,7 @@ type xmlInterface struct {
 	ProductID                string
 	RestCode                 int
 	ExpirationDateTimeFormat time.Time
+	URL                      string
 	ResultGetLicenseIdByAnchor
 }
 
@@ -45,13 +44,13 @@ func (x *xmlInterface) GetLicenseIdByAnchor() error {
 	defer logger.Println("End GetLicenseIdByAnchor")
 
 	if x.Id == "" || time.Now().Sub(x.ExpirationDateTimeFormat) >= 0 {
-		url := fmt.Sprintf("%s/%s", LSAPI_UCS_URL, "GetLicenseIdByAnchor")
+		url := fmt.Sprintf("%s/%s", x.URL, "GetLicenseIdByAnchor")
 		logger.Debugf("Request:\n%s", url)
 
 		client := &http.Client{}
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			return errors.Wrap(err, "ошибка при выполнении httprouter.NewRequest")
+			return errors.Wrap(err, "ошибка при выполнении httphandler.NewRequest")
 		}
 
 		x.Anchor = fmt.Sprintf("6:%s#%d/17", x.ProductID, x.RestCode)
@@ -117,7 +116,7 @@ func (x *xmlInterface) GetLicenseIdByAnchor() error {
 	return nil
 }
 
-func NewXmlInterface(UserName, Password, Token, ProductID, GUID string, RestCode int) (*xmlInterface, error) {
+func NewXmlInterface(UserName, Password, Token, ProductID, GUID string, RestCode int, URL string) (*xmlInterface, error) {
 	logger := logging.GetLogger()
 	logger.Println("Start NewXmlInterface")
 	defer logger.Println("End NewXmlInterface")
@@ -143,6 +142,10 @@ func NewXmlInterface(UserName, Password, Token, ProductID, GUID string, RestCode
 		return nil, errors.New("не указан RestCode")
 	}
 
+	if URL == "" {
+		return nil, errors.New("не указан URL")
+	}
+
 	xmlI = new(xmlInterface)
 	xmlI.Usr, err = GenUsr(UserName, Password, Token)
 	if err != nil {
@@ -152,12 +155,14 @@ func NewXmlInterface(UserName, Password, Token, ProductID, GUID string, RestCode
 	xmlI.Guid = GUID
 	xmlI.ProductID = ProductID
 	xmlI.RestCode = RestCode
+	xmlI.URL = URL
 
 	logger.Debugf("Anchor: %s", xmlI.Anchor)
 	logger.Debugf("RestCode: %d", xmlI.RestCode)
 	logger.Debugf("Guid: %s", xmlI.Guid)
 	logger.Debugf("Usr: %s", xmlI.Usr)
 	logger.Debugf("ProductID: %s", xmlI.ProductID)
+	logger.Debugf("URL: %s", xmlI.URL)
 
 	return xmlI, nil
 }

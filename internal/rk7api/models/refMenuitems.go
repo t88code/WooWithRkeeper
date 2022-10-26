@@ -13,4 +13,7 @@ type MenuitemItem struct {
 	Status          int    `xml:"Status,attr"`
 	ID_BX24         int    `xml:"genIDBX24,attr"`
 	SectionID_BX24  int    `xml:"genSectionIDBX24,attr"`
+	WOO_ID          int    `xml:"genWOO_ID,attr"`
+	WOO_PARENT_ID   int    `xml:"genWOO_PARENT_ID,attr"`
+	WOO_LONGNAME    string `xml:"genWOO_LONGNAME,attr"`
 }

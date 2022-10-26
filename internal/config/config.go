@@ -18,14 +18,16 @@ type (
 			Pass string
 		}
 		RK7MID struct {
-			URL           string
-			User          string
-			Pass          string
-			OrderTypeCode int
-			TableCode     int
-			StationCode   int
-			TimeoutError  int
-			CurrencyCode  int
+			URL                  string
+			User                 string
+			Pass                 string
+			OrderTypeCode        int
+			TableCode            int
+			StationCode          int
+			TimeoutError         int
+			CurrencyCode         int
+			CateglistIdentIgnore []int
+			MenuitemIdentIgnore  []int
 		}
 		TELEGRAM struct {
 			BotToken string
@@ -66,12 +68,14 @@ type (
 			MenuCategoryId int
 		}
 		XMLINTERFACE struct {
+			Type      int
 			UserName  string
 			Password  string
 			Token     string
 			RestCode  int
 			ProductID string
-			GUID      string
+			Guid      string
+			URL       string
 		}
 	}
 )

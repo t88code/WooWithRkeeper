@@ -212,7 +212,6 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	Order.OrderType.Code = cfg.RK7MID.OrderTypeCode
 	Order.Table = new(modelsRK7API.Table)
 	Order.Table.Code = cfg.RK7MID.TableCode
-	Order.PersistentComment = "комментарий которыой сохраняемый" //TODO
 	Order.ExtSource = "Woocommerce"
 	Order.ExtID = strconv.Itoa(WebhookCreatOrder.Id)
 
@@ -230,11 +229,12 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var PersonType string                                            // Props - PersonType - Тип заказчика (Юр.лицо/Физ.лицо)
 	var PersonName = fmt.Sprint(WebhookCreatOrder.Billing.FirstName) // Props - PersonName - Имя заказчика
 	var LastName string = fmt.Sprint(WebhookCreatOrder.Billing.LastName)
+	var FIO = fmt.Sprintf("%s %s", LastName, PersonName)
 	var CompanyName string = fmt.Sprint(WebhookCreatOrder.Billing.Company) // Props - CompanyName - Наименование Юр.лица (если выбрано Юр.лицо)
 	var CompanyDetails string                                              // Props - CompanyDetails - Реквизиты Юр.лица (если выбрано Юр.лицо)
 	var Phone string = WebhookCreatOrder.Billing.Phone                     // Props - Phone - Телефон заказчика
 	var Email string = WebhookCreatOrder.Billing.Email                     // Props - Email - e-mail заказчика
-	var Comment string                                                     // Props - Comment - Комментарий
+	var Comment = fmt.Sprint(WebhookCreatOrder.CustomerNote)               // Props - Comment - Комментарий
 	var OrderDetails string                                                // Props - OrderDetails - Дополнительные параметры к заказу
 	var OrderSum string = WebhookCreatOrder.Total                          // Props - OrderSum - Итоговая стоимость заказа
 	var DateCreated string = WebhookCreatOrder.DateCreated                 // Props - DateCreated - Дата оформления заказа
@@ -242,6 +242,16 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var DateTimeStart string                                               // OpenTime
 	var DurationRK string                                                  //duration="1899-12-30T04:00:00"
 	var Deposit int                                                        // "10000"
+
+	if CompanyName != "" {
+		Order.Holder = fmt.Sprintf("#%d %s", ID, CompanyName)
+		Order.NonPersistentComment = FIO
+	} else {
+		Order.Holder = fmt.Sprintf("#%d", ID)
+		Order.NonPersistentComment = FIO
+	}
+
+	Order.PersistentComment = Phone
 
 	var servicesNotation, dishsNotation, totalNotation []string
 	//Банкетное меню lite (25000 ₽), Каскад из шампанского (10000 ₽), Ковровая дорожка (3000 ₽)
@@ -270,18 +280,16 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 		Name:  "Phone",
 		Value: Phone,
 	})
-	if CompanyName == "" {
-		Props = append(Props, &modelsRK7API.Prop{
-			Name:  "PersonName",
-			Value: PersonName,
-		})
-	} else {
+	if CompanyName != "" {
 		Props = append(Props, &modelsRK7API.Prop{
 			Name:  "PersonName",
 			Value: CompanyName,
 		})
 	}
-
+	Props = append(Props, &modelsRK7API.Prop{
+		Name:  "FIO",
+		Value: FIO,
+	})
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "LastName",
 		Value: LastName,
@@ -433,8 +441,6 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 			PersonType = ""
 			//CompanyDetails = fmt.Sprint(WebhookCreatOrder.LineItems[0].MetaData[0].Value.CompanyDetails) // Props - CompanyDetails - Реквизиты Юр.лица (если выбрано Юр.лицо)
 			CompanyDetails = ""
-			//Comment = WebhookCreatOrder.LineItems[0].MetaData[0].Value.Comment                           // Props - Comment - Комментарий
-			Comment = ""
 
 			durationTime := time.Date(1899, 12, 30, 0, 0, 0, 0, time.UTC)
 
@@ -477,7 +483,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 			/*
 				for _, dish := range WebhookCreatOrder.LineItems[0].MetaData[0].Value.Resources {
 					name := fmt.Sprint(dish.Name)
-					price := fmt.Sprint(dish.Price)
+					price := fmt.Sprint(dish.RegularPrice)
 					dishsNotation = append(dishsNotation, fmt.Sprintf("%s (%s руб)", name, price))
 				}
 			*/
@@ -487,7 +493,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 			/*
 				for _, item := range WebhookCreatOrder.LineItems[0].MetaData[1].Value.Items {
 					label := fmt.Sprint(item.Label)
-					price := fmt.Sprint(item.Price)
+					price := fmt.Sprint(item.RegularPrice)
 					servicesNotation = append(servicesNotation, fmt.Sprintf("%s (%s руб)", label, price))
 				}
 
@@ -549,6 +555,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	logger.Debug("PersonType: ", PersonType)
 	logger.Debug("PersonName: ", PersonName)
 	logger.Debug("LastName: ", LastName)
+	logger.Debug("FIO: ", FIO)
 	logger.Debug("CompanyName: ", CompanyName)
 	logger.Debug("CompanyDetails: ", CompanyDetails)
 	logger.Debug("Phone: ", Phone)

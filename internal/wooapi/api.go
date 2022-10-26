@@ -31,6 +31,8 @@ type WOOAPI interface {
 	ProductCategoryDelete(ID int, opts ...optionsWoo.Option) error
 }
 
+var wooapiGlobal *wooapi
+
 type wooapi struct {
 	url    string
 	key    string
@@ -222,7 +224,7 @@ func (w *wooapi) ProductAdd(p *models.Product) (*models.Product, error) {
 		if bodyBytes, err := ioutil.ReadAll(r.Body); err != nil {
 			return nil, errors.Wrapf(err, "ошибка при ioutil.ReadAll(r.Body): error: %v", err)
 		} else {
-
+			logger.Debug("Responce:")
 			logger.Debugf(string(bodyBytes))
 			var product models.Product
 			err := json.Unmarshal(bodyBytes, &product)
@@ -680,10 +682,16 @@ func NewAPI(url, key, secret string) WOOAPI {
 		},
 	})
 
-	return &wooapi{
+	wooapiGlobal = &wooapi{
 		url:    url,
 		key:    key,
 		secret: secret,
 		api:    api,
 	}
+
+	return wooapiGlobal
+}
+
+func GetAPI() WOOAPI {
+	return wooapiGlobal
 }

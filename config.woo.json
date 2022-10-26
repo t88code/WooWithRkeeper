@@ -1,0 +1,10 @@
+{
+  "debug": true,
+  "url": "http://new.hotelslovakia.ru",
+  "version": "v3",
+  "consumer_key": "ck_cf6124d91750072feac87b9a1dc389334d7b3502",
+  "consumer_secret": "cs_4d6e9326c4a718e627428934d39b61073eb23f32",
+  "add_authentication_to_url": false,
+  "timeout": 10,
+  "verify_ssl": false
+}

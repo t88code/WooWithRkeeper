@@ -11,8 +11,9 @@ type Categlist struct {
 	Parent                int    `xml:"Parent,attr"`
 	ID_BX24               int    `xml:"genIDBX24,attr"`
 	SectionID_BX24        int    `xml:"genSectionIDBX24,attr"`
-	WOO_ID                int    `xml:"WOO_ID,attr"`
-	WOO_PARENT_ID         int    `xml:"WOO_PARENT_ID,attr"`
+	WOO_ID                int    `xml:"genWOO_ID,attr"`
+	WOO_PARENT_ID         int    `xml:"genWOO_PARENT_ID,attr"`
 	WOO_ID_SYNC_RK        bool   //просинхронен в rkeeper
 	WOO_PARENT_ID_SYNC_RK bool   //просинхронен в rkeeper
+	WOO_LONGNAME          string `xml:"genWOO_LONGNAME,attr"`
 }
