@@ -6,7 +6,6 @@ import (
 	"WooWithRkeeper/internal/handlers/httphandler"
 	"WooWithRkeeper/internal/license"
 	"WooWithRkeeper/internal/rk7api"
-	"WooWithRkeeper/internal/sync"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/version"
 	"WooWithRkeeper/internal/wooapi"
@@ -38,7 +37,7 @@ func main() {
 	check.Check()
 	cfg := config.GetConfig()
 
-	go sync.SyncMenuServiceWithRecovered()
+	//go sync.SyncMenuServiceWithRecovered()
 	go telegram.BotStart()
 
 	router := httprouter.New()

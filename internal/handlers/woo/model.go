@@ -343,3 +343,33 @@ type WebhookCreatOrderError struct {
 		} `json:"customer"`
 	} `json:"_links"`
 }
+
+type T struct {
+	LineItems []struct {
+		Id          int           `json:"id"`
+		Name        string        `json:"name"`
+		ProductId   int           `json:"product_id"`
+		VariationId int           `json:"variation_id"`
+		Quantity    int           `json:"quantity"`
+		TaxClass    string        `json:"tax_class"`
+		Subtotal    string        `json:"subtotal"`
+		SubtotalTax string        `json:"subtotal_tax"`
+		Total       string        `json:"total"`
+		TotalTax    string        `json:"total_tax"`
+		Taxes       []interface{} `json:"taxes"`
+		MetaData    []struct {
+			Id           int         `json:"id"`
+			Key          string      `json:"key"`
+			Value        interface{} `json:"value"`
+			DisplayKey   string      `json:"display_key"`
+			DisplayValue interface{} `json:"display_value"`
+		} `json:"meta_data"`
+		Sku   string `json:"sku"`
+		Price int    `json:"price"`
+		Image struct {
+			Id  string `json:"id"`
+			Src string `json:"src"`
+		} `json:"image"`
+		ParentName interface{} `json:"parent_name"`
+	} `json:"line_items"`
+}

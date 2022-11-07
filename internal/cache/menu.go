@@ -45,6 +45,7 @@ type menu struct {
 	//RK7 - Menuitems
 	MenuitemsRK7        []*modelsRK7API.MenuitemItem
 	MenuitemsRK7ByIdent map[int]*modelsRK7API.MenuitemItem
+	MenuitemsRK7ByWooID map[int]*modelsRK7API.MenuitemItem
 
 	//RK7 - Categlists
 	CateglistsRK7        []*modelsRK7API.Categlist

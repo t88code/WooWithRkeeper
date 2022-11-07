@@ -272,6 +272,7 @@ func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs *[]mod
 			return nil, errors.Wrap(err, "failed GetXmlInterface()")
 		}
 
+		RK7QuerySaveOrder.RK7CMD.LicenseInfo = new(models.LicenseInfo)
 		RK7QuerySaveOrder.RK7CMD.LicenseInfo.Anchor = xmlInterface.Anchor
 		RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseToken = xmlInterface.Id
 		RK7QuerySaveOrder.RK7CMD.LicenseInfo.LicenseInstance.Guid = xmlInterface.Guid
