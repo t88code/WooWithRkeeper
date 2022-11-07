@@ -6,6 +6,7 @@ import (
 	"WooWithRkeeper/internal/database"
 	"WooWithRkeeper/internal/rk7api"
 	"WooWithRkeeper/internal/telegram"
+	"WooWithRkeeper/internal/wooapi"
 	"WooWithRkeeper/pkg/logging"
 	"fmt"
 	"github.com/jmoiron/sqlx"
@@ -18,10 +19,26 @@ func SyncMenuServiceWithRecovered() {
 	logger := logging.GetLogger()
 	logger.Println("Start Service SyncMenuServiceWithRecovered")
 	defer logger.Println("End Service SyncMenuServiceWithRecovered")
-	index := 0 //количество перезапусков
+
+	cfg := config.GetConfig()
+
+	index := 0 //количество перезапусков при панике
 	for {
 		SyncMenuService()
 		index++
+
+		_, err := cache.NewCacheMenu()
+		if err != nil {
+			logger.Error("failed in cache.NewCacheMenu()")
+		}
+
+		_ = wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
+
+		_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
+		if err != nil {
+			logger.Fatal("failed main init; rk7api.NewAPI; ", err)
+		}
+
 		if index == 3 {
 			break
 		}
@@ -66,7 +83,7 @@ func SyncMenuService() {
 	for {
 		timeStart := time.Now()
 		if cfg.MENUSYNC.SyncCateglist == 1 {
-			// сверить справочники Categlist
+			// сверить версию справочника Categlist
 			verifyVersionResult, err := VerifyVersion(RK7API, DB, "Categlist")
 			if err != nil {
 				telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Не удалось выполнить проверку меню. Ошибка при проверке VerifyVersion: %v", err))
@@ -88,13 +105,13 @@ func SyncMenuService() {
 
 		if cfg.MENUSYNC.SyncMenuitems == 1 {
 
-			// сверить справочники Menuitems
+			// сверить версию справочника Menuitems
 			verifyVersionResultMenuitems, err := VerifyVersion(RK7API, DB, "Menuitems")
 			if err != nil {
 				telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Не удалось выполнить проверку меню. Ошибка при проверке VerifyVersion: %v", err))
 				continue
 			}
-			// сверить справочники Price
+			// сверить версию справочника Price
 			verifyVersionResultPrices, err := VerifyVersion(RK7API, DB, "Prices")
 			if err != nil {
 				telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Не удалось выполнить проверку меню. Ошибка при проверке VerifyVersion: %v", err))

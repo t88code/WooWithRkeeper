@@ -16,4 +16,5 @@ type MenuitemItem struct {
 	WOO_ID          int    `xml:"genWOO_ID,attr"`
 	WOO_PARENT_ID   int    `xml:"genWOO_PARENT_ID,attr"`
 	WOO_LONGNAME    string `xml:"genWOO_LONGNAME,attr"`
+	WOO_IMAGE       string `xml:"genWOO_IMAGE,attr"`
 }

@@ -290,7 +290,7 @@ func (m *menu) RefreshCateglist() error {
 		modelsRK7API.IgnoreEnums("1"),
 		modelsRK7API.WithChildItems("3"),
 		modelsRK7API.WithMacroProp("1"),
-		modelsRK7API.PropMask("items.(Ident,ItemIdent,GUIDString,Code,Name,MainParentIdent,Status,Parent,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME)"))
+		modelsRK7API.PropMask("items.(Ident,ItemIdent,GUIDString,Code,Name,MainParentIdent,Status,Parent,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,)"))
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetRefData")
 	}
@@ -327,7 +327,7 @@ func (m *menu) RefreshMenuitems() error {
 		modelsRK7API.IgnoreEnums("1"),
 		modelsRK7API.WithChildItems("3"),
 		modelsRK7API.WithMacroProp("1"),
-		modelsRK7API.PropMask("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^3,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME)"))
+		modelsRK7API.PropMask("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^3,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO_IMAGE)"))
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetRefData")
 	}
@@ -431,7 +431,7 @@ func NewCacheMenu() (Menu, error) {
 	logger := logging.GetLogger()
 	logger.Info("Start NewCacheMenu")
 	defer logger.Info("End NewCacheMenu")
-
+	cacheMenuGlobal = menu{}
 	return &cacheMenuGlobal, nil
 }
 

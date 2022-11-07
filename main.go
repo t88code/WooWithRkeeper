@@ -1,11 +1,13 @@
 package main
 
 import (
+	"WooWithRkeeper/internal/cache"
 	"WooWithRkeeper/internal/config"
 	"WooWithRkeeper/internal/database"
 	"WooWithRkeeper/internal/handlers/httphandler"
 	"WooWithRkeeper/internal/license"
 	"WooWithRkeeper/internal/rk7api"
+	"WooWithRkeeper/internal/sync"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/version"
 	"WooWithRkeeper/internal/wooapi"
@@ -37,7 +39,7 @@ func main() {
 	check.Check()
 	cfg := config.GetConfig()
 
-	//go sync.SyncMenuServiceWithRecovered()
+	go sync.SyncMenuServiceWithRecovered()
 	go telegram.BotStart()
 
 	router := httprouter.New()
@@ -61,6 +63,11 @@ func init() {
 	_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
 	if err != nil {
 		logger.Fatal("failed main init; rk7api.NewAPI; ", err)
+	}
+
+	_, err = cache.NewCacheMenu()
+	if err != nil {
+		logger.Error("failed in cache.NewCacheMenu()")
 	}
 
 	if database.Exists(database.DB_NAME) != true {

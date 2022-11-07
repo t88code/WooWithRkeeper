@@ -2,14 +2,14 @@
 
 ## Проблемы
 
-* pc.Parent = cfg.WOOCOMMERCE.MenuCategoryId // TODO новая папка создается в этой категории по конфигу
-* ??? надо ли так делать, может если найдена то ничего не делать и по второму этапу синхронизации все присвоить?????? pc.Parent = cfg.WOOCOMMERCE.MenuCategoryId // TODO если папка найдена, то она присваивается к ккегории по умолчанию
-* у продукта, который мы создали в woo должен быть уникальный идентификатор из кипера, чтобы я могу потом его найти, а не создавать новые папки, а менять его роддительскую папку и другие параметры(имя и parent только)
+~~* pc.Parent = cfg.WOOCOMMERCE.MenuCategoryId // TODO новая папка создается в этой категории по конфигу~~
+~~* ??? надо ли так делать, может если найдена то ничего не делать и по второму этапу синхронизации все присвоить?????? pc.Parent = cfg.WOOCOMMERCE.MenuCategoryId // TODO если папка найдена, то она присваивается к ккегории по умолчанию~~
+~~* у продукта, который мы создали в woo должен быть уникальный идентификатор из кипера, чтобы я могу потом его найти, а не создавать новые папки, а менять его роддительскую папку и другие параметры(имя и parent только)~~
 
 ## Решение
-// TODO поиск надо делать по уникальному идентификатору из кипера, потому что сперва происходит создание продукта на основе кипера и потом попытка присвоить идентификатор
-// и если идентификатор не присвоился в кипере, то блюдо надо будет !!создавать снова!! потому что оно не найдено
-// пока сделать в description добавить идентификатор и по нему искать в productCategoriesMapByID
+~~// TODO поиск надо делать по уникальному идентификатору из кипера, потому что сперва происходит создание продукта на основе кипера и потом попытка присвоить идентификатор~~
+~~// и если идентификатор не присвоился в кипере, то блюдо надо будет !!создавать снова!! потому что оно не найдено~~
+~~// пока сделать в description добавить идентификатор и по нему искать в productCategoriesMapByID~~
 
 
 ### Доступ
@@ -69,69 +69,23 @@ http://new.hotelslovakia.ru/restoran-le-nuar/
 * Один заказ на визит - Включен
 * Пустые визиты - Выключен
 
-### "Костыль" Win1251 кодировка
-#### Алгоритм реализации:
-
-Скрипт, при открытии заказа на кассе rkeeper, отправляет Get запрос в микросервис с параметром name. В ответе скрипт получает значение поля name и сохраняет его в расширенном свойстве с именем name1521. МС всегда игнорирует поля с именем name1251 и в результате не получает ошибку при попытке преобразовать win1251<>utf8.
-
-* Скрипт на форме Редактирование заказа
-    * Событие - CheckViewOnShow
-    * Код:
-```
-procedure saveProp(key, value: String);
-var
-  Props: TVisitOrderInfo;
-begin
-  Props := TVisitOrderInfo.Create();
-  Props.CustomProps.Values[key+'1251'] := value;
-  RKCheck.UpdateOrderProps(Props);
-end;
-
-procedure updateProps();
-var value : string;
-  ErrorCode : integer;
-  Prop: TCustomProp;
-  i: integer;
-begin
-  for i := 0 to RKCheck.CurrentOrder.CustomProps.Count - 1 do
-    begin
-    Prop := TCustomProp(RKCheck.CurrentOrder.CustomProps.Items[i]);
-    if (prop.propname='HallName') or (prop.propname='CompanyName') or (prop.propname='PersonName') or (prop.propname='LastName') or (prop.propname='OrderDetails') then 
-            begin       
-            ErrorCode := HttpGet('http://192.168.0.11:8081/prop/' + inttostr(RKCheck.CurrentOrder.UVN) + '/' + prop.propname , value);      
-            if ErrorCode = 0 then
-               begin 
-               saveProp(prop.propname, value);
-               end; 
-            end;   
-    end;
-end;
-
-procedure CheckViewOnShowScript(Sender: TObject);
-var  R : string;
-  ErrorCode : integer;
-begin
- updateProps();
-  updateProps();
- 
-end;
-```
-
-#### Расширенные свойства
+### Расширенные свойства
 
 #### 1. Пользовательские, для элементов: Меню, Группа Меню 
-* genWooID
-* genWooParentCategoryID
+* LongName - genLongName
+* WOO_ID - genWOO_ID
+* WOO_PARENT_ID - genWOO_PARENT_ID
+* WOO_IMAGE - genWOO_IMAGE
 
 #### 2. Свойства для заказов:
-##### Включенные для отображения
+##### Включенные для отображения(необязательно)
 * CompanyName1251 - Компания
 * HallName1251 - Зал
 * OrderDetails1251 - Примечание
 * PersonName1251 - Имя клиента
 * Phone - Телефон
 * Email - Почта
-##### Отключенные для отображения
+##### Отключенные для отображения(необязательно)
 * LastName1251 - Фамилия
 * CompanyName - Компания
 * HallName - Зал
@@ -139,7 +93,7 @@ end;
 * PersonName - Имя клиента
 
 ## Бронирование залов
-### Наименовение полей
+### Наименовение полей(необходимо обновить)
 
 * Наименование зала
   * HallName = WebhookCreatOrder.LineItems[0].Name
