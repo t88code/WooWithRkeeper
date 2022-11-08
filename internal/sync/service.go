@@ -98,7 +98,7 @@ func SyncMenuService() {
 					telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации Categlist SyncMenu: \n%v\n", err))
 				} else {
 					logger.Infof("Синхронизация Categlist выполнена успешно. Версия справочника Categlist в DB обновлена")
-					logger.Infof("Время обновления Categlist(без обновления кеша): %s", time.Now().Sub(timeStart))
+					logger.Infof("Время обновления Categlist: %s", time.Now().Sub(timeStart))
 				}
 			}
 		}
@@ -129,7 +129,16 @@ func SyncMenuService() {
 					telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации меню SyncMenu: \n%v\n", err))
 				} else {
 					logger.Infof("Синхронизация меню выполнена успешно. Версия справочника Menuitems и Prices в DB обновлена")
-					logger.Infof("Время обновления Menuitems(без обновления кеша): %s", time.Now().Sub(timeStart))
+					logger.Infof("Время обновления Menuitems: %s", time.Now().Sub(timeStart))
+
+					err := SyncImages()
+					if err != nil {
+						telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации картинок SyncMenu: \n%v\n", err))
+					} else {
+						logger.Infof("Синхронизация картинок выполнена успешно")
+						logger.Infof("Время обновления Images: %s", time.Now().Sub(timeStart))
+					}
+
 				}
 			}
 		}
