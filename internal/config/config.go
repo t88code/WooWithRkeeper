@@ -13,21 +13,26 @@ import (
 type (
 	Config struct {
 		RK7 struct {
-			URL  string
-			User string
-			Pass string
+			URL                      string
+			User                     string
+			Pass                     string
+			CateglistIdentIgnore     []int
+			MenuitemIdentIgnore      []int
+			CLASSIFICATORGROUPS      int
+			CLASSIFICATORGROUPSALLOW int
+			CLASSIFICATORGROUPSDENY  int
+			PRICETYPE                int
 		}
 		RK7MID struct {
-			URL                  string
-			User                 string
-			Pass                 string
-			OrderTypeCode        int
-			TableCode            int
-			StationCode          int
-			TimeoutError         int
-			CurrencyCode         int
-			CateglistIdentIgnore []int
-			MenuitemIdentIgnore  []int
+			URL           string
+			User          string
+			Pass          string
+			OrderTypeCode int
+			TableCode     int
+			StationCode   int
+			TimeoutError  int
+			CurrencyCode1 int
+			CurrencyCode2 int
 		}
 		TELEGRAM struct {
 			BotToken string
@@ -41,9 +46,13 @@ type (
 		}
 		MENUSYNC struct {
 			Timeout        int
+			SyncImages     int
 			SyncMenuitems  int
 			SyncCateglist  int
 			TelegramReport int
+		}
+		IMAGESYNC struct {
+			Path string
 		}
 		ORDERSYNC struct {
 			Timeout int
@@ -66,6 +75,7 @@ type (
 			Key            string
 			Secret         string
 			MenuCategoryId int
+			RPS            int
 		}
 		XMLINTERFACE struct {
 			Type      int
@@ -102,7 +112,7 @@ func GetConfig() *Config {
 
 		logger.Print("Config:>Read application configurations")
 
-		err = gcfg.ReadFileInto(&cfg, "config.ini")
+		err = gcfg.ReadFileInto(&cfg, "./config/config.ini")
 		if err != nil {
 			logger.Fatalf("Config:>Failed to parse gcfg data: %s", err)
 		} else {

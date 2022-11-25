@@ -23,8 +23,11 @@ func SyncCateglist() error {
 	defer logger.Info("End SyncCateglist")
 
 	var err error
-	var errSync []string
+	var resultSyncAll []string
+	var resultSyncError []string
 	var errText string
+	var flagNeedUpdate bool = false
+
 	cfg := config.GetConfig()
 	rk7API := rk7api.GetAPI()
 	DB, err := sqlx.Connect("sqlite3", database.DB_NAME)
@@ -76,6 +79,7 @@ func SyncCateglist() error {
 
 	// папки RK7
 	var categlistActive int
+	// todo добавить неактивные блюда
 
 	// папки найденные в WOO
 	var categlistNeedDelInWoo []*modelsRK7API.Categlist      // папки удаленные в RK7 и найдены в WOO - удалить в WOO
@@ -95,7 +99,7 @@ LoopOneStage:
 
 		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
 
-		for _, ignoreIdent := range cfg.RK7MID.CateglistIdentIgnore {
+		for _, ignoreIdent := range cfg.RK7.CateglistIdentIgnore {
 			if categlist.Ident == ignoreIdent {
 				logger.Debug("Игнорируем по настройкам конфига")
 				logger.Debug("--------------------------------------")
@@ -157,7 +161,7 @@ LoopOneStage:
 	logger.Info("Папки RK7:")
 	logger.Infof("Всего: %d", len(categlists))
 	logger.Infof("Активные: %d", categlistActive)
-	logger.Infof("Игнорировано: %d", len(cfg.RK7MID.CateglistIdentIgnore))
+	logger.Infof("Игнорировано: %d", len(cfg.RK7.CateglistIdentIgnore))
 
 	logger.Infof("Найдено в WOO: %d", len(categlistNeedDelInWoo)+len(categlistNeedUpdateInWoo)+len(categlistNoNeedUpdateInWoo))
 	logger.Infof("Удалить в WOO: %d", len(categlistNeedDelInWoo))
@@ -174,106 +178,192 @@ LoopOneStage:
 	logger.Infof("ProductCategoriesWooByID: %d", len(categoriesWooByID))
 	logger.Infof("ProductCategoriesWooBySlug: %d", len(categoriesWooBySlug))
 
-	logger.Info("Удаляем в WOO:")
-	var delCountInWoo int
-	for i, categlist := range categlistNeedDelInWoo {
-		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-		err = DeleteCateglistInWoo(categlistNeedDelInWoo[i])
-		if err != nil {
-			logger.Error(err.Error())
-			errSync = append(errSync, err.Error())
-		} else {
-			logger.Info("Папка успешно удалена в WOO")
-			delCountInWoo++
-		}
-	}
-	logger.Infof("Удалено %d папок в WOO", delCountInWoo)
-
-	logger.Info("Обновляем в WOO:")
-	var updateCountInWoo int
-	for i, categlist := range categlistNeedUpdateInWoo {
-		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-		err = UpdateCateglistInWoo(categlistNeedUpdateInWoo[i])
-		if err != nil {
-			logger.Error(err.Error())
-			errSync = append(errSync, err.Error())
-		} else {
-			logger.Info("Папка успешно обновлена в WOO")
-			updateCountInWoo++
-		}
-	}
-	logger.Infof("Обновлено %d папок в WOO", updateCountInWoo)
-
-	logger.Info("Создаем в WOO:")
-	var createCountInWoo int
-	for i, categlist := range categlistIndefiniteWithWooIDActive {
-		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-		err = CreateCateglistInWoo(categlistIndefiniteWithWooIDActive[i])
-		if err != nil {
-			logger.Error(err.Error())
-			errSync = append(errSync, err.Error())
-		} else {
-			logger.Info("Папка успешно создана в WOO")
-			createCountInWoo++
-		}
-	}
-	for i, categlist := range categlistIndefiniteActive {
-		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-		err = CreateCateglistInWoo(categlistIndefiniteActive[i])
-		if err != nil {
-			logger.Error(err.Error())
-			errSync = append(errSync, err.Error())
-		} else {
-			logger.Info("Папка успешно создана в WOO")
-			createCountInWoo++
-		}
-	}
-	logger.Infof("Создано %d папок в WOO", createCountInWoo)
-
-	logger.Info("Обнулить в RK7:")
-	var nulledCountInRK7 int
-	for i, categlist := range categlistIndefiniteWithWooIDNotActive {
-		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-		if categlist.WOO_ID == 0 && categlist.WOO_PARENT_ID == cfg.WOOCOMMERCE.MenuCategoryId {
-			logger.Infof("Обнуление WOO_ID/WOO_PARENT_ID в RK7 не требуется. WOO_ID=0, WOO_PARENT_ID=%d", cfg.WOOCOMMERCE.MenuCategoryId)
-		} else {
-			err = NulledCateglistInRK7(categlistIndefiniteWithWooIDNotActive[i])
+	//++++
+	if len(categlistNeedDelInWoo) > 0 {
+		logger.Info("Удаляем в WOO:")
+		var delCountInWoo int
+		for i, categlist := range categlistNeedDelInWoo {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			err = DeleteCateglistInWoo(categlistNeedDelInWoo[i])
 			if err != nil {
+				errText = fmt.Sprintf("%s;%v", c, err)
 				logger.Error(err.Error())
-				errSync = append(errSync, err.Error())
+				resultSyncAll = append(resultSyncAll, errText)
+				resultSyncError = append(resultSyncAll, errText)
 			} else {
-				logger.Info("Папка успешно обнулена в RK7")
-				nulledCountInRK7++
+				text := fmt.Sprintf("%s, папка успешно удалена в WOO", c)
+				logger.Debug(text)
+				resultSyncAll = append(resultSyncAll, text)
+				delCountInWoo++
 			}
 		}
-
+		logger.Infof("Удалено %d папок в WOO", delCountInWoo)
 	}
-	for i, categlist := range categlistIndefiniteNotActive {
-		logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-		if categlist.WOO_ID == 0 && categlist.WOO_PARENT_ID == cfg.WOOCOMMERCE.MenuCategoryId {
-			logger.Infof("Обнуление WOO_ID/WOO_PARENT_ID в RK7 не требуется. WOO_ID=0, WOO_PARENT_ID=%d", cfg.WOOCOMMERCE.MenuCategoryId)
-		} else {
-			err = NulledCateglistInRK7(categlistIndefiniteNotActive[i])
+
+	//++++
+	if len(categlistNeedUpdateInWoo) > 0 {
+		logger.Info("Обновляем в WOO:")
+		var updateCountInWoo int
+		for i, categlist := range categlistNeedUpdateInWoo {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			err = UpdateCateglistInWoo(categlistNeedUpdateInWoo[i])
 			if err != nil {
+				errText = fmt.Sprintf("%s;%v", c, err)
 				logger.Error(err.Error())
-				errSync = append(errSync, err.Error())
+				resultSyncAll = append(resultSyncAll, errText)
+				resultSyncError = append(resultSyncAll, errText)
 			} else {
-				logger.Info("Папка успешно обнулена в RK7")
-				nulledCountInRK7++
+				text := fmt.Sprintf("%s, папка успешно обновлена в WOO", c)
+				logger.Debug(text)
+				resultSyncAll = append(resultSyncAll, text)
+				updateCountInWoo++
 			}
 		}
+		logger.Infof("Обновлено %d папок в WOO", updateCountInWoo)
 	}
-	logger.Infof("Обновлено %d папок в RK7", nulledCountInRK7)
 
-	if len(errSync) > 0 && cfg.MENUSYNC.TelegramReport == 1 {
+	//++++
+	if len(categlistIndefiniteWithWooIDActive) > 0 ||
+		len(categlistIndefiniteActive) > 0 {
+		logger.Info("Создаем в WOO:")
+		var createCountInWoo int
+		for i, categlist := range categlistIndefiniteWithWooIDActive {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			err := CreateCateglistInWoo(categlistIndefiniteWithWooIDActive[i])
+			if err != nil {
+				errText = fmt.Sprintf("%s;%v", c, err)
+				logger.Error(err.Error())
+				resultSyncAll = append(resultSyncAll, errText)
+				if errors.Unwrap(errors.Unwrap(err)).Error() == ERROR_CREATE_PRODUCTCATEGORY_EXIST {
+					originalName := categlistIndefiniteWithWooIDActive[i].Name
+					categlistIndefiniteWithWooIDActive[i].Name = fmt.Sprintf("%s_%d", categlistIndefiniteWithWooIDActive[i].Name, categlistIndefiniteWithWooIDActive[i].Code)
+					text := fmt.Sprintf("Элемент с указанным именем уже существует у родительского элемента. Пробуем повторно создать с именем: %s", categlistIndefiniteWithWooIDActive[i].Name)
+					logger.Warning(text)
+					resultSyncAll = append(resultSyncAll, text)
+					err := CreateCateglistInWoo(categlistIndefiniteWithWooIDActive[i])
+					if err != nil {
+						errText = fmt.Sprintf("%s;%v", c, err)
+						logger.Error(err.Error())
+						resultSyncAll = append(resultSyncAll, errText)
+						resultSyncError = append(resultSyncAll, errText)
+					} else {
+						text := "Папка успешно создана"
+						logger.Debug(text)
+						resultSyncAll = append(resultSyncAll, text)
+						flagNeedUpdate = true
+					}
+					categlistIndefiniteWithWooIDActive[i].Name = originalName
+				} else {
+					resultSyncError = append(resultSyncAll, errText)
+				}
+			} else {
+				text := fmt.Sprintf("%s, папка успешно создана в WOO", c)
+				logger.Debug(text)
+				resultSyncAll = append(resultSyncAll, text)
+				createCountInWoo++
+			}
+		}
+		for i, categlist := range categlistIndefiniteActive {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			err := CreateCateglistInWoo(categlistIndefiniteActive[i])
+			if err != nil {
+				errText = fmt.Sprintf("%s;%v", c, err)
+				logger.Error(err.Error())
+				resultSyncAll = append(resultSyncAll, errText)
+				if errors.Unwrap(errors.Unwrap(err)).Error() == ERROR_CREATE_PRODUCTCATEGORY_EXIST {
+					originalName := categlistIndefiniteWithWooIDActive[i].Name
+					categlistIndefiniteActive[i].Name = fmt.Sprintf("%s_%d", categlistIndefiniteActive[i].Name, categlistIndefiniteActive[i].Code)
+					text := fmt.Sprintf("Элемент с указанным именем уже существует у родительского элемента. Пробуем повторно создать с именем: %s", categlistIndefiniteActive[i].Name)
+					logger.Warning(text)
+					resultSyncAll = append(resultSyncAll, text)
+					err := CreateCateglistInWoo(categlistIndefiniteActive[i])
+					if err != nil {
+						errText = fmt.Sprintf("%s;%v", c, err)
+						logger.Error(err.Error())
+						resultSyncAll = append(resultSyncAll, errText)
+						resultSyncError = append(resultSyncAll, errText)
+					} else {
+						text := "Папка успешно создана"
+						logger.Debug(text)
+						resultSyncAll = append(resultSyncAll, text)
+						flagNeedUpdate = true
+					}
+					categlistIndefiniteWithWooIDActive[i].Name = originalName
+				} else {
+					resultSyncError = append(resultSyncAll, errText)
+				}
+			} else {
+				text := fmt.Sprintf("%s, папка успешно создана в WOO", c)
+				logger.Debug(text)
+				resultSyncAll = append(resultSyncAll, text)
+				createCountInWoo++
+			}
+		}
+		logger.Infof("Создано %d папок в WOO", createCountInWoo)
+	}
+
+	//++++
+	if len(categlistIndefiniteWithWooIDNotActive) > 0 ||
+		len(categlistIndefiniteNotActive) > 0 {
+		logger.Info("Обнулить в RK7:")
+		var nulledCountInRK7 int
+		for i, categlist := range categlistIndefiniteWithWooIDNotActive {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			if categlist.WOO_ID == 0 && categlist.WOO_PARENT_ID == cfg.WOOCOMMERCE.MenuCategoryId {
+				logger.Debugf("Обнуление WOO_ID/WOO_PARENT_ID в RK7 не требуется. WOO_ID=0, WOO_PARENT_ID=%d", cfg.WOOCOMMERCE.MenuCategoryId)
+			} else {
+				err = NulledCateglistInRK7(categlistIndefiniteWithWooIDNotActive[i])
+				if err != nil {
+					errText = fmt.Sprintf("%s;%v", c, err)
+					logger.Error(err.Error())
+					resultSyncAll = append(resultSyncAll, errText)
+					resultSyncError = append(resultSyncAll, errText)
+				} else {
+					text := fmt.Sprintf("%s, папка успешно обнулена в RK7", c)
+					logger.Debug(text)
+					resultSyncAll = append(resultSyncAll, text)
+					nulledCountInRK7++
+				}
+			}
+		}
+		for i, categlist := range categlistIndefiniteNotActive {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			if categlist.WOO_ID == 0 && categlist.WOO_PARENT_ID == cfg.WOOCOMMERCE.MenuCategoryId {
+				logger.Debugf("Обнуление WOO_ID/WOO_PARENT_ID в RK7 не требуется. WOO_ID=0, WOO_PARENT_ID=%d", cfg.WOOCOMMERCE.MenuCategoryId)
+			} else {
+				err = NulledCateglistInRK7(categlistIndefiniteNotActive[i])
+				if err != nil {
+					errText = fmt.Sprintf("%s;%v", c, err)
+					logger.Error(err.Error())
+					resultSyncAll = append(resultSyncAll, errText)
+					resultSyncError = append(resultSyncAll, errText)
+				} else {
+					logger.Debug("Папка успешно обнулена в RK7")
+					text := fmt.Sprintf("%s, папка успешно обнулена в RK7", c)
+					resultSyncAll = append(resultSyncAll, text)
+					nulledCountInRK7++
+				}
+			}
+		}
+		logger.Infof("Обновлено %d папок в RK7", nulledCountInRK7)
+	}
+
+	if len(resultSyncError) > 0 {
 		logger.Info("1-й этап синхронизации завершился с ошибками")
-		telegram.SendMessageToTelegramWithLogError(strings.Join(errSync, "\n"))
+		if cfg.MENUSYNC.TelegramReport == 1 {
+			telegram.SendMessageToTelegramWithLogError(strings.Join(resultSyncAll, "\n"))
+		} else if cfg.MENUSYNC.TelegramReport == 2 {
+			telegram.SendMessageToTelegramWithLogError(strings.Join(resultSyncError, "\n"))
+		}
 	} else {
 		logger.Info("1-й этап синхронизации завершился успешно")
 		logger.Info("Запущен 2-й этап синхронизации: свойства WOO_PARENT_ID/иерархия папок")
-
-		// todo нужно ли обновлять кеш или не стоит - подумать
-
 		// папки найденные в WOO
 		var categlistNotActive []*modelsRK7API.Categlist                 // Папка не активна в RK7. Игнорируем
 		var categlistNoNeedUpdateParentIdInWoo []*modelsRK7API.Categlist // Папка RK7 совпадает с WOO(свойства WOO_PARENT_ID). Обновление в WOO не требуется
@@ -284,13 +374,17 @@ LoopOneStage:
 		var categlistNotInCacheWithoutWooIDActive []*modelsRK7API.Categlist    // Папка RK7: не найдена в кеше WOO/активная. Папка должны быть с WOO_ID
 		var categlistNotInCacheWithoutWooIDNotActive []*modelsRK7API.Categlist // Папка RK7: не найдена в кеше WOO/активная. Папка должны быть с WOO_ID
 		var categlistNotWooIdActive []*modelsRK7API.Categlist                  // Папка RK7 без WOO_ID, активная. Папка должны быть с WOO_ID, сообщаем об ошибке
-		var categlistNotWooIdNotActive []*modelsRK7API.Categlist               // Папка RK7 без WOO_ID, не активная. Папка должны быть с WOO_ID, сообщаем об ошибке
+		var categlistNotWooIdNotActive []*modelsRK7API.Categlist               // Папка RK7 без WOO_ID, не активная. Cообщаем без ошибок// TODO resultSyncAll = append(resultSyncAll, errText)
+
+		// необходимо обнcateglistNoNeedUpdateNameInWooовить наименование папок
+		var categlistNoNeedUpdateNameInWoo []*modelsRK7API.Categlist
+		var categlistNeedUpdateNameInWoo []*modelsRK7API.Categlist
 
 	LoopTwoStage:
 		for i, categlist := range categlists {
 			logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
 
-			for _, ignoreIdent := range cfg.RK7MID.CateglistIdentIgnore {
+			for _, ignoreIdent := range cfg.RK7.CateglistIdentIgnore {
 				if categlist.Ident == ignoreIdent {
 					logger.Debug("Игнорируем по настройкам конфига")
 					logger.Debug("--------------------------------------")
@@ -328,10 +422,20 @@ LoopOneStage:
 								logger.Debug("Папка RK7 не совпадает с WOO(свойства WOO_PARENT_ID). Обновление в WOO требуется")
 								categlistNeedUpdateParentIdInWoo = append(categlistNeedUpdateParentIdInWoo, categlists[i])
 							}
+
+							logger.Debugf("RK.Name=%s && WOO.Name=%s", categlist.Name, category.Name)
+							if categlist.Name == category.Name {
+								logger.Debug("Папка RK7 совпадает с WOO(свойство Name). Обновление в WOO не требуется")
+								categlistNoNeedUpdateNameInWoo = append(categlistNoNeedUpdateNameInWoo, categlists[i])
+							} else {
+								logger.Debug("Папка RK7 не совпадает с WOO(свойства Name). Обновление в WOO требуется")
+								categlistNeedUpdateNameInWoo = append(categlistNeedUpdateNameInWoo, categlists[i])
+							}
+
 						} else {
 							errText = fmt.Sprintf("Папка RK7 Parent не найдена в кеше RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-							logger.Error(errText)
-							errSync = append(errSync, errText)
+							logger.Error(err.Error())
+							resultSyncAll = append(resultSyncAll, errText)
 							categlistNotFoundCateglistParent = append(categlistNotFoundCateglistParent, categlists[i])
 						}
 					}
@@ -343,19 +447,22 @@ LoopOneStage:
 						errText = fmt.Sprintf("Папка RK7: не найдена в кеше WOO/активная. Папка должны быть с WOO_ID: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
 						categlistNotInCacheWithoutWooIDNotActive = append(categlistNotInCacheWithoutWooIDNotActive, categlists[i])
 					}
-					logger.Error(errText)
-					errSync = append(errSync, errText)
+					logger.Error(err.Error())
+					resultSyncAll = append(resultSyncAll, errText)
 				}
 			} else {
 				if categlist.Status == 3 {
 					errText = fmt.Sprintf("Папка RK7 без WOO_ID, активная. Папка должны быть с WOO_ID: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
 					categlistNotWooIdActive = append(categlistNotWooIdActive, categlists[i])
+					logger.Error(err.Error())
+					resultSyncError = append(resultSyncAll, errText)
+					resultSyncAll = append(resultSyncAll, errText)
 				} else {
 					errText = fmt.Sprintf("Папка RK7 без WOO_ID, не активная. Папка должны быть с WOO_ID: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
 					categlistNotWooIdNotActive = append(categlistNotWooIdNotActive, categlists[i])
+					logger.Warning(errText)
+					resultSyncAll = append(resultSyncAll, errText)
 				}
-				logger.Error(errText)
-				errSync = append(errSync, errText)
 			}
 			logger.Debug("--------------------------------------")
 		}
@@ -379,11 +486,14 @@ LoopOneStage:
 		logger.Infof("ProductCategoriesWooByID: %d", len(categoriesWooByID))
 		logger.Infof("ProductCategoriesWooBySlug: %d", len(categoriesWooBySlug))
 
+		logger.Infof("Необходимо обновить Name: %d", len(categlistNeedUpdateNameInWoo))
+		logger.Infof("Обновить Name не требуется: %d", len(categlistNoNeedUpdateNameInWoo))
+
 		logger.Info("Обновляем в WOO и RK7:")
 		var updateCountInWoo, updateCountInRK7 int
 		for i, categlist := range categlistNeedUpdateParentIdInWoo {
-			logger.Debugf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
-
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
 			if categlistParent, found := categlistsRK7ByIdent[categlist.MainParentIdent]; found {
 				logger.Debug("Папка Parent найдена в кеше RK7")
 				var parentID int
@@ -400,51 +510,97 @@ LoopOneStage:
 					logger.Debug("WOO_PARENT_ID актуальный. Обновление в RK7 не требуется")
 				} else {
 					logger.Debug("WOO_PARENT_ID не актуальный. Обновление в RK7 требуется")
-					err = UpdateCateglistInRK7(categlistNeedUpdateParentIdInWoo[i], parentID)
+					err = UpdateParentIDCateglistInRK7(categlistNeedUpdateParentIdInWoo[i], parentID)
 					if err != nil {
+						errText = fmt.Sprintf("%s;%v", c, err)
 						logger.Error(err.Error())
-						errSync = append(errSync, err.Error())
+						resultSyncAll = append(resultSyncAll, errText)
+						resultSyncError = append(resultSyncAll, errText)
 					} else {
-						logger.Info("Папка успешно обновлена в RK7")
+						logger.Debug("Папка успешно обновлена в RK7")
+						text := fmt.Sprintf("%s, папка успешно обновлена в RK7", c)
+						resultSyncAll = append(resultSyncAll, text)
 						updateCountInRK7++
-						logger.Info("Выполняем поиск папки в WOO")
+						logger.Debug("Выполняем поиск папки в WOO")
 						if _, found := categoriesWooByID[categlist.WOO_ID]; found {
 							logger.Debug("Папка найдена в WOO. Выполняем обновление")
 							err = UpdateCateglistInWoo(categlistNeedUpdateParentIdInWoo[i])
 							if err != nil {
+								errText = fmt.Sprintf("%s;%v", c, err)
 								logger.Error(err.Error())
-								errSync = append(errSync, err.Error())
+								resultSyncAll = append(resultSyncAll, errText)
+								resultSyncError = append(resultSyncAll, errText)
 							} else {
-								logger.Info("Папка успешно обновлена в WOO")
+								logger.Debug("Папка успешно обновлена в WOO")
+								text := fmt.Sprintf("%s, папка успешно обновлена в WOO", c)
+								resultSyncAll = append(resultSyncAll, text)
 								updateCountInWoo++
 							}
 						} else {
-							errText = "Папка не найдена в кеше WOO. Обновление не выполнить"
-							logger.Error(errText)
-							errSync = append(errSync, errText)
+							logger.Error("Папка не найдена в кеше WOO. Обновление не выполнить")
+							errText = fmt.Sprintf("%s;%v", c, "Папка не найдена в кеше WOO. Обновление не выполнить")
+							resultSyncAll = append(resultSyncAll, errText)
+							resultSyncError = append(resultSyncAll, errText)
 						}
 					}
 				}
 			} else {
 				errText = "Папка RK7 Parent: не найдена в кеше RK7"
-				logger.Error(errText)
-				errSync = append(errSync, errText)
+				logger.Error(err.Error())
+				telegramText := fmt.Sprintf("%s;%v", c, errText)
+				resultSyncAll = append(resultSyncAll, telegramText)
+				resultSyncError = append(resultSyncAll, telegramText)
 			}
 		}
 		logger.Infof("Обновлено %d папок в WOO", updateCountInWoo)
 		logger.Infof("Обновлено %d папок в RK7", updateCountInRK7)
 		if updateCountInWoo != updateCountInRK7 {
 			errText = fmt.Sprintf("Не совпадает количество папок обновления в WOO=%d и RK7=%d", updateCountInWoo, updateCountInRK7)
-			logger.Error(errText)
-			errSync = append(errSync, errText)
+			logger.Error(err.Error())
+			telegramText := errText
+			resultSyncAll = append(resultSyncAll, telegramText)
+			resultSyncError = append(resultSyncAll, telegramText)
 		}
 
-		if len(errSync) > 0 && cfg.MENUSYNC.TelegramReport == 1 {
+		//++
+		logger.Info("Обновляем Name в WOO и RK7:")
+		for i, categlist := range categlistNeedUpdateNameInWoo {
+			c := fmt.Sprintf("Папка RK7: Name: %s, Longname: %s, RK_CODE: %d, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status %d", categlist.Name, categlist.WOO_LONGNAME, categlist.Code, categlist.ItemIdent, categlist.WOO_ID, categlist.WOO_PARENT_ID, categlist.Status)
+			logger.Debug(c)
+			logger.Debug("Выполняем поиск папки в WOO")
+			if _, found := categoriesWooByID[categlist.WOO_ID]; found {
+				err := UpdateCateglistInWoo(categlistNeedUpdateNameInWoo[i])
+				if err != nil {
+					errText = fmt.Sprintf("%s;%v", c, err)
+					logger.Error(err.Error())
+					resultSyncAll = append(resultSyncAll, errText)
+					resultSyncError = append(resultSyncAll, errText)
+				} else {
+					logger.Debug("Папка успешно обновлена в WOO")
+					text := fmt.Sprintf("%s, папка успешно обновлена в WOO", c)
+					resultSyncAll = append(resultSyncAll, text)
+					updateCountInWoo++
+				}
+			} else {
+				logger.Error("Папка не найдена в кеше WOO. Обновление не выполнить")
+				errText = fmt.Sprintf("%s;%v", c, "Папка не найдена в кеше WOO. Обновление не выполнить")
+				resultSyncAll = append(resultSyncAll, errText)
+				resultSyncError = append(resultSyncAll, errText)
+			}
+		}
+
+		if len(resultSyncError) > 0 {
 			logger.Info("2-й этап синхронизации завершился с ошибками")
-			telegram.SendMessageToTelegramWithLogError(strings.Join(errSync, "\n"))
+			if cfg.MENUSYNC.TelegramReport == 1 {
+				telegram.SendMessageToTelegramWithLogError(strings.Join(resultSyncAll, "\n"))
+			} else if cfg.MENUSYNC.TelegramReport == 2 {
+				telegram.SendMessageToTelegramWithLogError(strings.Join(resultSyncError, "\n"))
+			}
 		} else {
 			logger.Info("2-й этап синхронизации завершился успешно")
-
+			if cfg.MENUSYNC.TelegramReport == 1 {
+				telegram.SendMessageToTelegramWithLogError("2-й этап синхронизации завершился успешно")
+			}
 			VersionRefName, err := GetVersion(rk7API, "Categlist")
 			if err != nil {
 				return errors.Wrapf(err, "failed GetVersion(RK7API, %s)", "Categlist")
@@ -462,16 +618,23 @@ LoopOneStage:
 		}
 	}
 
-	return nil
+	if flagNeedUpdate {
+		return errors.New(SYNC_CATEGLIST_NEED_UPDATE)
+	} else {
+		return nil
+	}
 }
 
+const SYNC_CATEGLIST_NEED_UPDATE = "Need update"
+
+//++
 // удалить папку в Woo
 func DeleteCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	//TODO при удалении может быть не найдено блюдо, нужно будет тогда проигнорировать ошибку
 
 	logger := logging.GetLogger()
-	logger.Info("Start DeleteCateglistInWoo")
-	defer logger.Info("End DeleteCateglistInWoo")
+	logger.Debug("Start DeleteCateglistInWoo")
+	defer logger.Debug("End DeleteCateglistInWoo")
 
 	var err error
 	woo := wooapi.GetAPI()
@@ -479,17 +642,17 @@ func DeleteCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при получении кеша меню")
 	}
-	logger.Infof("Удаляем папку из WOO/кеша WOO")
+	logger.Debugf("Удаляем папку из WOO/кеша WOO")
 	err = woo.ProductCategoryDelete(categlist.WOO_ID)
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при удалении папки из WOO")
 	} else {
-		logger.Info("Обнуляем кеш WOO")
+		logger.Debug("Обнуляем кеш WOO")
 		err = menu.DeleteProductCategoryFromCache(categlist.WOO_ID)
 		if err != nil {
 			return errors.Wrap(err, "Ошибка при удалении папки из кеша WOO")
 		} else {
-			logger.Info("Обнулен кеш WOO. Папка успешно удалена из WOO.")
+			logger.Debug("Обнулен кеш WOO. Папка успешно удалена из WOO.")
 			err = NulledCateglistInRK7(categlist)
 			if err != nil {
 				return errors.Wrap(err, "failed NulledCateglistInRK7(categlist)")
@@ -500,13 +663,14 @@ func DeleteCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	}
 }
 
+//++
 // обновить папку в Woo - свойство Name и Parent
 func UpdateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	//TODO если при обновлении не найдено блюдо, то необходимо его создать и после обновить папку RK7
 
 	logger := logging.GetLogger()
-	logger.Info("Start UpdateCateglistInWoo")
-	defer logger.Info("End UpdateCateglistInWoo")
+	logger.Debug("Start UpdateCateglistInWoo")
+	defer logger.Debug("End UpdateCateglistInWoo")
 
 	var err error
 	woo := wooapi.GetAPI()
@@ -514,7 +678,7 @@ func UpdateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 		return errors.Wrap(err, "Ошибка при получении кеша меню")
 	}
 
-	logger.Infof("Обновляем папку в WOO/кеше WOO")
+	logger.Debugf("Обновляем папку в WOO/кеше WOO")
 	category, err := woo.ProductCategoryGet(categlist.WOO_ID)
 	if err != nil {
 		return errors.Wrapf(err, "Ошибка при получении ProductCategoryGet(ID=%d)", categlist.WOO_ID)
@@ -544,7 +708,7 @@ func UpdateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 				category.Parent = recoveryParent
 				return errors.Wrap(err, "Ошибка при обновлении папки. Кеш восстановлен")
 			} else {
-				logger.Info("Папка успешно обновлена. Кеш обновлен")
+				logger.Debug("Папка успешно обновлена. Кеш обновлен")
 				return nil
 			}
 		} else {
@@ -553,13 +717,16 @@ func UpdateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	}
 }
 
+const ERROR_CREATE_PRODUCTCATEGORY_EXIST = "code:term_exists; message:Элемент с указанным именем уже существует у родительского элемента.; status:400; display:; details:;"
+
+//++
 // создать папку в Woo
 func CreateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	//TODO подумать какие ошибки могут быть например если не удастся создать в WOO потому что существует
 
 	logger := logging.GetLogger()
-	logger.Info("Start CreateCateglistInWoo")
-	defer logger.Info("End CreateCateglistInWoo")
+	logger.Debug("Start CreateCateglistInWoo")
+	defer logger.Debug("End CreateCateglistInWoo")
 
 	var err error
 	woo := wooapi.GetAPI()
@@ -593,12 +760,12 @@ func CreateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 				categoryCreated.ID,
 				categoryCreated.Parent,
 				categoryCreated.Slug)
-			logger.Info("Обновляем кеш WOO")
+			logger.Debug("Обновляем кеш WOO")
 			err = menu.AddProductCategoryToCache(categoryCreated)
 			if err != nil {
 				return errors.Wrap(err, "Ошибка при добавление папки в кеш WOO")
 			} else {
-				logger.Info("Обновлен кеш WOO. Обновляем свойства в RK7")
+				logger.Debug("Обновлен кеш WOO. Обновляем свойства в RK7")
 				var categlists []*modelsRK7API.Categlist
 				categlist.WOO_ID = categoryCreated.ID
 				categlist.WOO_PARENT_ID = cfg.WOOCOMMERCE.MenuCategoryId
@@ -609,7 +776,7 @@ func CreateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 					categlist.WOO_PARENT_ID = cfg.WOOCOMMERCE.MenuCategoryId
 					return errors.Wrap(err, "Ошибка при обновлении WOO_ID/WOO_PARENT_ID в RK7. Кеш установлен по умолчанию.")
 				} else {
-					logger.Info("Папка успешно обновлена")
+					logger.Debug("Папка успешно обновлена")
 					return nil
 				}
 			}
@@ -619,15 +786,16 @@ func CreateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	}
 }
 
+//++
 // обнулить папку в RK7 - свойства WOO_ID и WOO_PARENT_ID
 func NulledCateglistInRK7(categlist *modelsRK7API.Categlist) error {
 	logger := logging.GetLogger()
-	logger.Info("Start NulledCateglistInRK7")
-	defer logger.Info("End NulledCateglistInRK7")
+	logger.Debug("Start NulledCateglistInRK7")
+	defer logger.Debug("End NulledCateglistInRK7")
 	var err error
 	rk7 := rk7api.GetAPI()
 	cfg := config.GetConfig()
-	logger.Info("Обнуляем WOO_ID/WOO_PARENT_ID в RK7.")
+	logger.Debug("Обнуляем WOO_ID/WOO_PARENT_ID в RK7.")
 
 	var categlists []*modelsRK7API.Categlist
 	recoveryWooID := categlist.WOO_ID
@@ -641,20 +809,20 @@ func NulledCateglistInRK7(categlist *modelsRK7API.Categlist) error {
 		categlist.WOO_PARENT_ID = recoveryWooParentID
 		return errors.Wrap(err, "Ошибка при обнулении WOO_ID/WOO_PARENT_ID в RK7. Кеш восстановлен")
 	} else {
-		logger.Info("Папка успешно обновлена")
+		logger.Debug("Папка успешно обновлена")
 		return nil
-
 	}
 }
 
+//++
 // обновить папку в RK7 - свойство WOO_PARENT_ID
-func UpdateCateglistInRK7(categlist *modelsRK7API.Categlist, parentID int) error {
+func UpdateParentIDCateglistInRK7(categlist *modelsRK7API.Categlist, parentID int) error {
 	logger := logging.GetLogger()
-	logger.Info("Start UpdateCateglistInRK7")
-	defer logger.Info("End UpdateCateglistInRK7")
+	logger.Debug("Start UpdateParentIDCateglistInRK7")
+	defer logger.Debug("End UpdateParentIDCateglistInRK7")
 	var err error
 	rk7 := rk7api.GetAPI()
-	logger.Info("Обновляем WOO_PARENT_ID в RK7/кеше RK7")
+	logger.Debug("Обновляем WOO_PARENT_ID в RK7/кеше RK7")
 
 	var categlists []*modelsRK7API.Categlist
 	recoveryWooParentID := categlist.WOO_PARENT_ID
@@ -665,7 +833,7 @@ func UpdateCateglistInRK7(categlist *modelsRK7API.Categlist, parentID int) error
 		categlist.WOO_PARENT_ID = recoveryWooParentID
 		return errors.Wrap(err, "Ошибка при обновлении WOO_PARENT_ID в RK7. Кеш восстановлен")
 	} else {
-		logger.Info("Папка успешно обновлена в RK7/кеше RK7")
+		logger.Debug("Папка успешно обновлена в RK7/кеше RK7")
 		return nil
 	}
 }

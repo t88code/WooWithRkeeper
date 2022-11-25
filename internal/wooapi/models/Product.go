@@ -57,20 +57,30 @@ type Product struct {
 	PurchaseNote      string        `json:"purchase_note,omitempty"`
 	Categories        []*Categories `json:"categories,omitempty"`
 	Tags              []interface{} `json:"tags,omitempty"`
-	Images            []interface{} `json:"images,omitempty"`
-	Attributes        []interface{} `json:"attributes,omitempty"`
-	DefaultAttributes []interface{} `json:"default_attributes,omitempty"`
-	Variations        []interface{} `json:"variations,omitempty"`
-	GroupedProducts   []interface{} `json:"grouped_products,omitempty"`
-	MenuOrder         int           `json:"menu_order,omitempty"`
-	PriceHtml         string        `json:"price_html,omitempty"`
-	RelatedIds        []int         `json:"related_ids,omitempty"`
-	MetaData          []MetaData    `json:"meta_data,omitempty"`
-	StockStatus       string        `json:"stock_status,omitempty"`
-	HasOptions        bool          `json:"has_options,omitempty"`
-	Links             *Links        `json:"_links,omitempty"`
+	//Images            []interface{} `json:"images,omitempty"`
+	Images            []ProductImage `json:"images,omitempty"`
+	Attributes        []interface{}  `json:"attributes,omitempty"`
+	DefaultAttributes []interface{}  `json:"default_attributes,omitempty"`
+	Variations        []interface{}  `json:"variations,omitempty"`
+	GroupedProducts   []interface{}  `json:"grouped_products,omitempty"`
+	MenuOrder         int            `json:"menu_order,omitempty"`
+	PriceHtml         string         `json:"price_html,omitempty"`
+	RelatedIds        []int          `json:"related_ids,omitempty"`
+	MetaData          []MetaData     `json:"meta_data,omitempty"`
+	StockStatus       string         `json:"stock_status,omitempty"`
+	HasOptions        bool           `json:"has_options,omitempty"`
+	Links             *Links         `json:"_links,omitempty"`
 }
-
+type ProductImage struct {
+	Id              int    `json:"id,omitempty"`
+	DateCreated     string `json:"date_created,omitempty"`
+	DateCreatedGmt  string `json:"date_created_gmt,omitempty"`
+	DateModified    string `json:"date_modified,omitempty"`
+	DateModifiedGmt string `json:"date_modified_gmt,omitempty"`
+	Src             string `json:"src,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Alt             string `json:"alt,omitempty"`
+}
 type Dimensions struct {
 	Length string `json:"length,omitempty"`
 	Width  string `json:"width,omitempty"`

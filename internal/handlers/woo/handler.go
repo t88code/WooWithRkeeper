@@ -189,8 +189,8 @@ type m []map[string]interface{}
 func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 	logger := logging.GetLogger()
-	logger.Println("Start WebhookCreateOrderInRKeeper")
-	defer logger.Println("End WebhookCreateOrderInRKeeper")
+	logger.Info("Start WebhookCreateOrderInRKeeper")
+	defer logger.Info("End WebhookCreateOrderInRKeeper")
 	cfg := config.GetConfig()
 	RK7API, err := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7.User, cfg.RK7.Pass)
 	if err != nil {
@@ -308,7 +308,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 		logger.Info("Запускаем обработку заказа")
 		if len(WebhookCreatOrder.LineItems) > 0 {
 			for _, LineItems := range WebhookCreatOrder.LineItems {
-				fmt.Println(
+				logger.Debug(
 					LineItems.ProductId,
 					LineItems.Name,
 					LineItems.Quantity,
@@ -655,7 +655,13 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 		if Deposit != 0 {
 			prepay := new(modelsRK7API.Prepay)
-			prepay.Code = cfg.RK7MID.CurrencyCode
+
+			if WebhookCreatOrder.PaymentMethod == "" {
+				prepay.Code = cfg.RK7MID.CurrencyCode1
+			} else {
+				prepay.Code = cfg.RK7MID.CurrencyCode2 //"payment_method":"bacs"
+			}
+
 			prepay.Amount = Deposit * 100
 
 			logger.Infof("Необходимо добавить предоплату, на сумму %d", Deposit)

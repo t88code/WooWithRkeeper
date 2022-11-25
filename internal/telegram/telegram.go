@@ -96,7 +96,8 @@ func SendMessage(messageText string) error {
 	} else {
 		return errors.New("Bot.Send.Message:>Users in db is none")
 	}
-	logger.Infof("Bot.Send.Message:>%v", messageText)
+	logger.Debugf(
+		"Bot.Send.Message:>%v", messageText)
 
 	return nil
 }

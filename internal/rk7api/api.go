@@ -5,6 +5,7 @@ import (
 	"WooWithRkeeper/internal/rk7api/models"
 	"WooWithRkeeper/pkg/logging"
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"encoding/xml"
 	"fmt"
@@ -22,7 +23,7 @@ const ERROS_NUMBER_5305 = "5305"
 
 type RK7API interface {
 	GetRefList() (*models.RK7QueryResultGetRefList, error)
-	GetRefData(RefName string, opts ...models.GetRefDataOptions) (RK7QueryResult, error)
+	GetRefData(RefName string, replaceAttribut []ReplaceAttribut, opts ...models.GetRefDataOptions) (RK7QueryResult, error)
 
 	SetRefDataMenuitem(ID int, fields ...models.FieldMenuitemItem) (RK7QueryResult, error)
 	SetRefDataMenuitems(menuitemItems []*models.MenuitemItem) (*models.RK7QueryResultSetRefData, error)
@@ -47,6 +48,12 @@ type rk7api struct {
 	pass    string
 	xmlType int
 	xmlApi  *xmlInterface
+	*ReplaceAttribut
+}
+
+type ReplaceAttribut struct {
+	Source      string
+	Destination string
 }
 
 func (r *rk7api) GetXMLLicenseInstanceSeqNumber(Anchor, LicenseToken, Guid string) (*models.RK7QueryResultGetXMLLicenseInstanceSeqNumber, error) {
@@ -302,14 +309,14 @@ func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs *[]mod
 					RK7QueryResultSaveOrder.ErrorText == ERROS_TEXT_5305 ||
 					RK7QueryResultSaveOrder.RK7ErrorN == ERROS_NUMBER_5305) &&
 					indexRequestNumber <= 1 {
-					logger.Info("Получаем SeqNumber")
+					logger.Debug("Получаем SeqNumber")
 					RK7QueryResultGetXMLLicenseInstanceSeqNumber, err := r.GetXMLLicenseInstanceSeqNumber(xmlInterface.Anchor, xmlInterface.Id, xmlInterface.Guid)
 					if err != nil {
 						return nil, errors.Wrap(err, "failed GetXMLLicenseInstanceSeqNumber")
 					}
 					xmlInterface.SeqNumber = RK7QueryResultGetXMLLicenseInstanceSeqNumber.LicenseInfo.LicenseInstance.SeqNumber + 1
 					indexRequestNumber++
-					logger.Info("Повторная отправка")
+					logger.Debug("Повторная отправка")
 					continue
 				}
 				return nil, errors.New(fmt.Sprintf("Ошибка в Response RK7API.SaveOrder:>%s.%s", RK7QueryResultSaveOrder.Status, RK7QueryResultSaveOrder.ErrorText))
@@ -353,7 +360,7 @@ func (r *rk7api) CreateOrder(Order *models.OrderInRK7QueryCreateOrder) (*models.
 	return RK7QueryResultCreateOrder, nil
 }
 
-func (r *rk7api) GetRefData(RefName string, opts ...models.GetRefDataOptions) (RK7QueryResult, error) {
+func (r *rk7api) GetRefData(RefName string, replaceAttribut []ReplaceAttribut, opts ...models.GetRefDataOptions) (RK7QueryResult, error) {
 	RK7QueryGetRefData := new(models.RK7QueryGetRefData)
 	RK7QueryGetRefData.RK7CMD.CMD = "GetRefData"
 	RK7QueryGetRefData.RK7CMD.RefName = RefName
@@ -374,6 +381,13 @@ func (r *rk7api) GetRefData(RefName string, opts ...models.GetRefDataOptions) (R
 
 	switch strings.ToLower(RefName) {
 	case "menuitems":
+		if replaceAttribut != nil {
+			for _, attribut := range replaceAttribut {
+				if attribut.Source != "" {
+					xmlRK7QueryResultGetRefData = bytes.ReplaceAll(xmlRK7QueryResultGetRefData, []byte(attribut.Source), []byte(attribut.Destination))
+				}
+			}
+		}
 		rk7QueryResultGetRefDataMenuitems := new(models.RK7QueryResultGetRefDataMenuitems)
 		err = xml.Unmarshal(xmlRK7QueryResultGetRefData, rk7QueryResultGetRefDataMenuitems)
 		if err != nil {
@@ -507,15 +521,21 @@ func Send(url, user, pass string, data []byte) (respBody []byte, e error) {
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 	if err != nil {
-		logger.Infof("SendToApiRk7.NewRequest.ErrorBX24:>%s", err)
+		logger.Debugf("SendToApiRk7.NewRequest.ErrorBX24:>%s", err)
 		return nil, fmt.Errorf("SendToApiRk7.NewRequest.ErrorBX24:>%s", err)
 	}
-	req.SetBasicAuth(user, pass)
-	req.Header.Add("Content-Type", "application/rk7xml: charset=utf-8")
+	//req.SetBasicAuth(user, pass)
+	req.Header.Add("Accept-Encoding", "gzip")
+	req.Header.Add("Authorization", "Basic aHR0cF93b286MQ==")
+	req.Header.Add("Cache-Control", "no-cache")
+	req.Header.Add("Postman-Token", "33fe7fcc-3b92-49b7-ba3d-096c9cc86284")
+	req.Header.Add("Host", "127.0.0.1:22555")
+	req.Header.Add("Content-Length", "382")
+	//req.Header.Add("Content-Type", "text/xml; charset=UTF-8")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Infof("SendToApiRk7.Do.ErrorBX24:>%s", err)
+		logger.Debugf("SendToApiRk7.Do.ErrorBX24:>%s", err)
 		return nil, fmt.Errorf("SendToApiRk7.Do.ErrorBX24:>%s", err)
 	}
 	defer func(Body io.ReadCloser) {
@@ -527,16 +547,26 @@ func Send(url, user, pass string, data []byte) (respBody []byte, e error) {
 
 	logger.Debugf("SendToApiRk7.Response.Status:>%s", resp.Status)
 	logger.Debugf("SendToApiRk7.Response.Header:>%s", resp.Header)
+	logger.Debugf("SendToApiRk7.Response.Body:>%v", resp.Body)
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		logger.Error("Ошибка авторизация при обращении к API RK7")
 		return nil, errors.New("Ошибка авторизация при обращении к API RK7")
 	} else {
-		respBody, err = ioutil.ReadAll(resp.Body)
+		var reader io.ReadCloser
+		switch resp.Header.Get("Content-Encoding") {
+		case "gzip":
+			reader, err = gzip.NewReader(resp.Body)
+			defer reader.Close()
+		default:
+			reader = resp.Body
+		}
+
+		respBody, err = ioutil.ReadAll(reader)
 		_ = resp.Body.Close()
 		if err != nil {
-			logger.Infof("SendToApiRk7.ioutil.ReadAll.ErrorBX24:>%s", err)
-			return nil, fmt.Errorf("SendToApiRk7.ioutil.ReadAll.ErrorBX24:>%s", err)
+			logger.Debugf("SendToApiRk7.ioutil.ReadAll:>%s", err)
+			return nil, fmt.Errorf("SendToApiRk7.ioutil.ReadAll:>%s", err)
 		}
 		logger.Debugf("SendToApiRk7.Response:>\n%s", respBody)
 

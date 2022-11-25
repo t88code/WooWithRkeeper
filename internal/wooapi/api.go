@@ -1,6 +1,7 @@
 package wooapi
 
 import (
+	"WooWithRkeeper/internal/config"
 	"WooWithRkeeper/internal/wc-api-go/client"
 	"WooWithRkeeper/internal/wc-api-go/options"
 	"WooWithRkeeper/internal/wooapi/models"
@@ -13,6 +14,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type WOOAPI interface {
@@ -34,10 +36,33 @@ type WOOAPI interface {
 var wooapiGlobal *wooapi
 
 type wooapi struct {
-	url    string
-	key    string
-	secret string
-	api    client.Client
+	url         string
+	key         string
+	secret      string
+	api         client.Client
+	rps         int
+	requestTime time.Time
+}
+
+func (w *wooapi) CheckRPS() {
+	logger := logging.GetLogger()
+	logger.Println("CheckRPS:>Start")
+	defer logger.Println("CheckRPS:>End")
+
+	TimeRequest := w.requestTime
+	TimeNow := time.Now()
+	TimeDiff := time.Now().Sub(w.requestTime)
+	TimeRPS := time.Second / time.Duration(w.rps)
+
+	logger.Debugf("TimeRequest: %s", TimeRequest.Format("2006-01-02T15:04:05.000000"))
+	logger.Debugf("TimeNow: %s", TimeNow.Format("2006-01-02T15:04:05.000000"))
+	logger.Debugf("TimeDiff: %s", TimeDiff)
+
+	if TimeDiff <= TimeRPS {
+		timeSleep := TimeRequest.Add(TimeRPS).Sub(TimeNow)
+		logger.Debugf("Over RPS, timeSleep: %s", timeSleep)
+		time.Sleep(timeSleep)
+	}
 }
 
 func (w *wooapi) ProductGet(ID int) (*models.Product, error) {
@@ -45,12 +70,16 @@ func (w *wooapi) ProductGet(ID int) (*models.Product, error) {
 	logger.Println("ProductGet:>Start")
 	defer logger.Println("ProductGet:>End")
 
+	w.CheckRPS()
+
 	endpoint := fmt.Sprintf("products/%d", ID)
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if r, err := w.api.Get(endpoint, nil); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -70,6 +99,7 @@ func (w *wooapi) ProductGet(ID int) (*models.Product, error) {
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -96,7 +126,7 @@ func (w *wooapi) ProductList(opts ...optionsWoo.Option) ([]*models.Product, erro
 	logger := logging.GetLogger()
 	logger.Println("ProductList:>Start")
 	defer logger.Println("ProductList:>End")
-
+	w.CheckRPS()
 	endpoint := "products"
 	logger.Debugf("Endpoint: %s", endpoint)
 
@@ -109,8 +139,10 @@ func (w *wooapi) ProductList(opts ...optionsWoo.Option) ([]*models.Product, erro
 	}
 
 	if r, err := w.api.Get(endpoint, params); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -130,6 +162,7 @@ func (w *wooapi) ProductList(opts ...optionsWoo.Option) ([]*models.Product, erro
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -163,7 +196,9 @@ func (w *wooapi) ProductListAll() ([]*models.Product, error) {
 	var i = 1
 	perPage := 100
 	for {
+		w.CheckRPS()
 		productsTemp, err := w.ProductList(optionsWoo.PerPage(perPage), optionsWoo.Page(i))
+		w.requestTime = time.Now()
 		if err != nil {
 			logger.Errorf("ошибка при получении ProductList, PerPage:%d, Page:%d, error:%v", perPage, i, err)
 			return nil, errors.Wrapf(err, "ошибка при получении ProductList, PerPage:%d, Page:%d", perPage, i)
@@ -185,7 +220,7 @@ func (w *wooapi) ProductAdd(p *models.Product) (*models.Product, error) {
 	logger := logging.GetLogger()
 	logger.Println("ProductAdd:>Start")
 	defer logger.Println("ProductAdd:>End")
-
+	w.CheckRPS()
 	endpoint := fmt.Sprintf("products")
 	logger.Debugf("Endpoint: %s", endpoint)
 
@@ -194,8 +229,10 @@ func (w *wooapi) ProductAdd(p *models.Product) (*models.Product, error) {
 	}
 
 	if r, err := w.api.Post(endpoint, nil, p); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusCreated { //TODO надо подумать что значит статус 200 и будет ли он возникать
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -215,6 +252,7 @@ func (w *wooapi) ProductAdd(p *models.Product) (*models.Product, error) {
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -240,7 +278,7 @@ func (w *wooapi) ProductUpdate(p *models.Product) (*models.Product, error) {
 	logger := logging.GetLogger()
 	logger.Println("ProductUpdate:>Start")
 	defer logger.Println("ProductUpdate:>End")
-
+	w.CheckRPS()
 	if p.ID == 0 {
 		return nil, errors.New("не указана ID продукта")
 	}
@@ -249,8 +287,10 @@ func (w *wooapi) ProductUpdate(p *models.Product) (*models.Product, error) {
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if r, err := w.api.Put(endpoint, p); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK { //TODO есть ли еще статусы кроме 200
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -270,6 +310,7 @@ func (w *wooapi) ProductUpdate(p *models.Product) (*models.Product, error) {
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -295,7 +336,7 @@ func (w *wooapi) ProductDel(ID int, opts ...optionsWoo.Option) error {
 	logger := logging.GetLogger()
 	logger.Println("ProductDel:>Start")
 	defer logger.Println("ProductDel:>End")
-
+	w.CheckRPS()
 	endpoint := fmt.Sprintf("products/%d", ID)
 	logger.Debugf("Endpoint: %s", endpoint)
 
@@ -308,8 +349,10 @@ func (w *wooapi) ProductDel(ID int, opts ...optionsWoo.Option) error {
 	}
 
 	if r, err := w.api.Delete(endpoint, params); err != nil {
+		w.requestTime = time.Now()
 		return errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -332,6 +375,7 @@ func (w *wooapi) ProductDel(ID int, opts ...optionsWoo.Option) error {
 			return &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -358,13 +402,15 @@ func (w *wooapi) ProductCategoryGet(ID int) (*models.ProductCategory, error) {
 	logger := logging.GetLogger()
 	logger.Println("ProductCategoryGet:>Start")
 	defer logger.Println("ProductCategoryGet:>End")
-
+	w.CheckRPS()
 	endpoint := fmt.Sprintf("products/categories/%d", ID)
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if r, err := w.api.Get(endpoint, nil); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -384,6 +430,7 @@ func (w *wooapi) ProductCategoryGet(ID int) (*models.ProductCategory, error) {
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -410,7 +457,7 @@ func (w *wooapi) ProductCategoryList(opts ...optionsWoo.Option) ([]*models.Produ
 	logger := logging.GetLogger()
 	logger.Println("ProductCategoryList:>Start")
 	defer logger.Println("ProductCategoryList:>End")
-
+	w.CheckRPS()
 	endpoint := "products/categories"
 	logger.Debugf("Endpoint: %s", endpoint)
 
@@ -423,8 +470,10 @@ func (w *wooapi) ProductCategoryList(opts ...optionsWoo.Option) ([]*models.Produ
 	}
 
 	if r, err := w.api.Get(endpoint, params); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -444,6 +493,7 @@ func (w *wooapi) ProductCategoryList(opts ...optionsWoo.Option) ([]*models.Produ
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -477,7 +527,9 @@ func (w *wooapi) ProductCategoryListAll() ([]*models.ProductCategory, error) {
 	var i = 1
 	perPage := 100
 	for {
+		w.CheckRPS()
 		productsCategoryTemp, err := w.ProductCategoryList(optionsWoo.PerPage(perPage), optionsWoo.Page(i))
+		w.requestTime = time.Now()
 		if err != nil {
 			logger.Errorf("ошибка при получении ProductCategoryList, PerPage:%d, Page:%d, error:%v", perPage, i, err)
 			return nil, errors.Wrapf(err, "ошибка при получении ProductCategoryList, PerPage:%d, Page:%d", perPage, i)
@@ -499,7 +551,7 @@ func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductC
 	logger := logging.GetLogger()
 	logger.Println("ProductCategoryAdd:>Start")
 	defer logger.Println("ProductCategoryAdd:>End")
-
+	w.CheckRPS()
 	endpoint := fmt.Sprintf("products/categories")
 	logger.Debugf("Endpoint: %s", endpoint)
 
@@ -508,8 +560,10 @@ func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductC
 	}
 
 	if r, err := w.api.Post(endpoint, nil, c); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusCreated { //TODO надо подумать что значит статус 200 и будет ли он возникать
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -529,6 +583,7 @@ func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductC
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -554,7 +609,7 @@ func (w *wooapi) ProductCategoryUpdate(pc *models.ProductCategory) (*models.Prod
 	logger := logging.GetLogger()
 	logger.Println("ProductCategoryUpdate:>Start")
 	defer logger.Println("ProductCategoryUpdate:>End")
-
+	w.CheckRPS()
 	if pc.ID == 0 {
 		return nil, errors.New("не указана ID папки меню")
 	}
@@ -563,8 +618,10 @@ func (w *wooapi) ProductCategoryUpdate(pc *models.ProductCategory) (*models.Prod
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if r, err := w.api.Put(endpoint, pc); err != nil {
+		w.requestTime = time.Now()
 		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK { //TODO есть ли еще статусы кроме 200
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -583,6 +640,7 @@ func (w *wooapi) ProductCategoryUpdate(pc *models.ProductCategory) (*models.Prod
 			return nil, &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -608,7 +666,7 @@ func (w *wooapi) ProductCategoryDelete(ID int, opts ...optionsWoo.Option) error 
 	logger := logging.GetLogger()
 	logger.Println("ProductCategoryDelete:>Start")
 	defer logger.Println("ProductCategoryDelete:>End")
-
+	w.CheckRPS()
 	endpoint := fmt.Sprintf("products/categories/%d", ID)
 	logger.Debugf("Endpoint: %s", endpoint)
 
@@ -621,8 +679,10 @@ func (w *wooapi) ProductCategoryDelete(ID int, opts ...optionsWoo.Option) error 
 	}
 
 	if r, err := w.api.Delete(endpoint, params); err != nil {
+		w.requestTime = time.Now()
 		return errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusOK {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -645,6 +705,7 @@ func (w *wooapi) ProductCategoryDelete(ID int, opts ...optionsWoo.Option) error 
 			return &ErrorWoo
 		}
 	} else {
+		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -682,11 +743,14 @@ func NewAPI(url, key, secret string) WOOAPI {
 		},
 	})
 
+	cfg := config.GetConfig()
+
 	wooapiGlobal = &wooapi{
 		url:    url,
 		key:    key,
 		secret: secret,
 		api:    api,
+		rps:    cfg.WOOCOMMERCE.RPS,
 	}
 
 	return wooapiGlobal

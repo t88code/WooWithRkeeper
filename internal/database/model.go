@@ -20,6 +20,12 @@ type Order struct {
 	SYNC             int    `db:"Sync"`
 }
 
+type Menuitem struct {
+	ID             int    `db:"ID"`
+	Ident          int    `db:"IdentRK"`
+	IMAGE_MOD_TIME string `db:"ImageModTime"`
+}
+
 const DB_SCHEMA = `CREATE TABLE Orders (
 	ID integer PRIMARY KEY AUTOINCREMENT,
 	RK_VisitID integer,
@@ -39,40 +45,10 @@ CREATE TABLE Version (
 	Name text,
 	Version integer
 );
-`
 
-const DB_SCHEMA_OLD = `CREATE TABLE Orders (
-	ID integer PRIMARY KEY AUTOINCREMENT
-);
-
-CREATE TABLE MenuRK7 (
+CREATE TABLE Menuitem (
 	ID integer PRIMARY KEY AUTOINCREMENT,
-	Ident integer,
-	Code integer,
-	Name text,
-	RegularPrice integer,
-	MainParentIdent integer,
-	Status integer,
-	ID_BX24 integer
-);
-
-CREATE TABLE MenuBX24 (
-	ID integer PRIMARY KEY AUTOINCREMENT,
-	Name text,
-	RegularPrice integer
-);
-
-CREATE TABLE CateglistRK7 (
-	ID integer PRIMARY KEY AUTOINCREMENT,
-	Name text,
-	Ident integer,
-	Status integer,
-	Sync integer
-);
-
-CREATE TABLE Version (
-	ID integer PRIMARY KEY AUTOINCREMENT,
-	Name text,
-	Version integer
+	IdentRK integer,
+	ImageModTime text
 );
 `

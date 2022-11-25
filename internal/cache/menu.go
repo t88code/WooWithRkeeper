@@ -61,8 +61,8 @@ type menu struct {
 
 func (m *menu) AddProductToCache(product *modelsWOOAPI.Product) error {
 	logger := logging.GetLogger()
-	logger.Info("Start AddProductToCache")
-	defer logger.Info("End AddProductToCache")
+	logger.Debug("Start AddProductToCache")
+	defer logger.Debug("End AddProductToCache")
 
 	logger.Debugf("Блюдо: Name=%s, Id=%d, Parent=%d, Slug=%s, RegularPrice=%s",
 		product.Name, product.ID, product.Categories[0].Id, product.Slug, product.RegularPrice)
@@ -108,8 +108,8 @@ func (m *menu) AddProductToCache(product *modelsWOOAPI.Product) error {
 
 func (m *menu) DeleteProductFromCache(WOOID int) error {
 	logger := logging.GetLogger()
-	logger.Info("Start DeleteProductFromCache")
-	defer logger.Info("End DeleteProductFromCache")
+	logger.Debug("Start DeleteProductFromCache")
+	defer logger.Debug("End DeleteProductFromCache")
 
 	lenProductsWooByID := len(m.ProductsWooByID)
 
@@ -136,8 +136,8 @@ func (m *menu) DeleteProductFromCache(WOOID int) error {
 
 func (m *menu) AddProductCategoryToCache(category *modelsWOOAPI.ProductCategory) error {
 	logger := logging.GetLogger()
-	logger.Info("Start AddProductCategoryToCache")
-	defer logger.Info("End AddProductCategoryToCache")
+	logger.Debug("Start AddProductCategoryToCache")
+	defer logger.Debug("End AddProductCategoryToCache")
 
 	logger.Debugf("Папка: Name=%s, Id=%d, Parent=%d, Slug=%s",
 		category.Name, category.ID, category.Parent, category.Slug)
@@ -204,8 +204,8 @@ func (m *menu) AddProductCategoryToCache(category *modelsWOOAPI.ProductCategory)
 
 func (m *menu) DeleteProductCategoryFromCache(WOOID int) error {
 	logger := logging.GetLogger()
-	logger.Info("Start DeleteProductCategoryFromCache")
-	defer logger.Info("End DeleteProductCategoryFromCache")
+	logger.Debug("Start DeleteProductCategoryFromCache")
+	defer logger.Debug("End DeleteProductCategoryFromCache")
 
 	lenProductCategoriesWooByID := len(m.ProductCategoriesWooByID)
 	lenProductCategoriesWooBySlug := len(m.ProductCategoriesWooBySlug)
@@ -248,6 +248,12 @@ func (m *menu) GetMenuitems() ([]*modelsRK7API.MenuitemItem, error) {
 }
 
 func (m *menu) GetMenuitemsRK7ByIdent() (map[int]*modelsRK7API.MenuitemItem, error) {
+	if len(m.MenuitemsRK7ByIdent) == 0 {
+		err := m.RefreshMenuitems()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.MenuitemsRK7ByIdent, nil
 }
 
@@ -260,6 +266,12 @@ func (m *menu) GetCateglistsRK7ByIdent() (map[int]*modelsRK7API.Categlist, error
 }
 
 func (m *menu) GetProductsWooByID() (map[int]*modelsWOOAPI.Product, error) {
+	if len(m.ProductsWooByID) == 0 {
+		err := m.RefreshProducts()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.ProductsWooByID, nil
 }
 
@@ -274,8 +286,8 @@ func (m *menu) GetProductCategoriesWooBySlug() (map[string]*modelsWOOAPI.Product
 func (m *menu) RefreshCateglist() error {
 
 	logger := logging.GetLogger()
-	logger.Info("Start RefreshCateglist")
-	defer logger.Info("End RefreshCateglist")
+	logger.Debug("Start RefreshCateglist")
+	defer logger.Debug("End RefreshCateglist")
 	timeStart := time.Now()
 	cfg := config.GetConfig()
 	RK7API, err := rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
@@ -284,35 +296,35 @@ func (m *menu) RefreshCateglist() error {
 	}
 
 	//получить список всех Categlist из RK
-	logger.Info("Получить список Categlist из RK7")
-	Rk7QueryResultGetRefDataCateglist, err := RK7API.GetRefData("Categlist",
+	logger.Debug("Получить список Categlist из RK7")
+	Rk7QueryResultGetRefDataCateglist, err := RK7API.GetRefData("Categlist", nil,
 		modelsRK7API.OnlyActive("0"), //неактивные будем грохать в bitrix24
 		modelsRK7API.IgnoreEnums("1"),
 		modelsRK7API.WithChildItems("3"),
 		modelsRK7API.WithMacroProp("1"),
-		modelsRK7API.PropMask("items.(Ident,ItemIdent,GUIDString,Code,Name,MainParentIdent,Status,Parent,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,)"))
+		modelsRK7API.PropMask("items.(Ident,ItemIdent,GUIDString,Code,Name,MainParentIdent,Status,Parent,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME)"))
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetRefData")
 	}
 
 	categlists := (Rk7QueryResultGetRefDataCateglist).(*modelsRK7API.RK7QueryResultGetRefDataCateglist) //todo приведение в структуру работает прекрасно
 	m.CateglistsRK7 = categlists.RK7Reference.Items.Item
-	logger.Infof("Длина списка CateglistInRK7 = %d\n", len(m.CateglistsRK7))
+	logger.Debugf("Длина списка CateglistInRK7 = %d\n", len(m.CateglistsRK7))
 	m.CateglistsRK7ByIdent = make(map[int]*modelsRK7API.Categlist)
 
 	for i, item := range m.CateglistsRK7 {
 		m.CateglistsRK7ByIdent[item.ItemIdent] = m.CateglistsRK7[i]
 	}
-	logger.Infof("Создан CateglistMap, длина: %d", len(m.CateglistsRK7ByIdent))
-	logger.Infof("RefreshCateglist. Время обновления: %s", time.Now().Sub(timeStart))
+	logger.Debugf("Создан CateglistMap, длина: %d", len(m.CateglistsRK7ByIdent))
+	logger.Debugf("RefreshCateglist. Время обновления: %s", time.Now().Sub(timeStart))
 	return nil
 }
 
 func (m *menu) RefreshMenuitems() error {
 
 	logger := logging.GetLogger()
-	logger.Info("Start RefreshMenuitems")
-	defer logger.Info("End RefreshMenuitems")
+	logger.Debug("Start RefreshMenuitems")
+	defer logger.Debug("End RefreshMenuitems")
 	timeStart := time.Now()
 	cfg := config.GetConfig()
 	RK7API, err := rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
@@ -321,38 +333,51 @@ func (m *menu) RefreshMenuitems() error {
 	}
 
 	//получить актуальное меню RK7
-	logger.Info("Получить список всех блюд из RK7")
-	Rk7QueryResultGetRefDataMenuitems, err := RK7API.GetRefData("Menuitems",
+	logger.Debug("Получить список всех блюд из RK7")
+	var replaceAttribut []rk7api.ReplaceAttribut
+	replaceAttribut = append(replaceAttribut, rk7api.ReplaceAttribut{
+		Source:      fmt.Sprintf("CLASSIFICATORGROUPS-%d", cfg.RK7.CLASSIFICATORGROUPS),
+		Destination: "CLASSIFICATORGROUPS"})
+	replaceAttribut = append(replaceAttribut, rk7api.ReplaceAttribut{
+		Source:      fmt.Sprintf("PRICETYPES-%d", cfg.RK7.PRICETYPE),
+		Destination: "PRICETYPES"})
+
+	propMask := fmt.Sprintf("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^%d,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO_IMAGE,genWOO,genTEST,CLASSIFICATORGROUPS^%d)",
+		cfg.RK7.PRICETYPE,
+		cfg.RK7.CLASSIFICATORGROUPS)
+
+	Rk7QueryResultGetRefDataMenuitems, err := RK7API.GetRefData("Menuitems", replaceAttribut,
 		modelsRK7API.OnlyActive("0"), //неактивные будем менять статус на N ?или может удалять? в bitrix24
 		modelsRK7API.IgnoreEnums("1"),
 		modelsRK7API.WithChildItems("3"),
 		modelsRK7API.WithMacroProp("1"),
-		modelsRK7API.PropMask("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^3,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO_IMAGE)"))
+		modelsRK7API.PropMask(propMask))
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetRefData")
 	}
+
 	menuitems := (Rk7QueryResultGetRefDataMenuitems).(*modelsRK7API.RK7QueryResultGetRefDataMenuitems)
 	m.MenuitemsRK7 = menuitems.RK7Reference.Items.Item
-	logger.Infof("Длина списка MenuitemItemInRK7 = %d\n", len(m.MenuitemsRK7))
+	logger.Debugf("Длина списка MenuitemItemInRK7 = %d\n", len(m.MenuitemsRK7))
 
 	m.MenuitemsRK7ByIdent = make(map[int]*modelsRK7API.MenuitemItem)
 	for i, item := range m.MenuitemsRK7 {
 		m.MenuitemsRK7ByIdent[item.ItemIdent] = m.MenuitemsRK7[i]
 	}
-	logger.Infof("Длина списка MenuRK7MapByIdent = %d\n", len(m.MenuitemsRK7ByIdent))
-	logger.Infof("RefreshMenuitems. Время обновления: %s", time.Now().Sub(timeStart))
+	logger.Debugf("Длина списка MenuRK7MapByIdent = %d\n", len(m.MenuitemsRK7ByIdent))
+	logger.Debugf("RefreshMenuitems. Время обновления: %s", time.Now().Sub(timeStart))
 	return nil
 }
 
 func (m *menu) RefreshProducts() error {
 
 	logger := logging.GetLogger()
-	logger.Info("Start RefreshProducts")
-	defer logger.Info("End RefreshProducts")
+	logger.Debug("Start RefreshProducts")
+	defer logger.Debug("End RefreshProducts")
 
 	WOOAPI := wooapi.GetAPI()
 
-	logger.Info("Получить список всех товаров из WOO")
+	logger.Debug("Получить список всех товаров из WOO")
 	products, err := WOOAPI.ProductListAll()
 	if err != nil {
 		return errors.Wrap(err, "failed in WOOAPI.ProductListAll()")
@@ -364,7 +389,7 @@ func (m *menu) RefreshProducts() error {
 		m.ProductsWooByID[product.ID] = products[i]
 	}
 
-	logger.Infof("Длина списка ProductsWooByID = %d\n", len(m.ProductsWooByID))
+	logger.Debugf("Длина списка ProductsWooByID = %d\n", len(m.ProductsWooByID))
 
 	return nil
 }
@@ -372,12 +397,12 @@ func (m *menu) RefreshProducts() error {
 func (m *menu) RefreshProductCategories() error {
 
 	logger := logging.GetLogger()
-	logger.Info("Start RefreshProductCategories")
-	defer logger.Info("End RefreshProductCategories")
+	logger.Debug("Start RefreshProductCategories")
+	defer logger.Debug("End RefreshProductCategories")
 
 	WOOAPI := wooapi.GetAPI()
 
-	logger.Info("Получить список всех ProductCategories из WOO")
+	logger.Debug("Получить список всех ProductCategories из WOO")
 	productCategories, err := WOOAPI.ProductCategoryListAll()
 	if err != nil {
 		return errors.Wrap(err, "failed in WOOAPI.ProductCategoryListAll()")
@@ -392,8 +417,8 @@ func (m *menu) RefreshProductCategories() error {
 		m.ProductCategoriesWooBySlug[productCategory.Slug] = productCategories[i]
 	}
 
-	logger.Infof("Длина списка ProductCategoriesWooByID = %d\n", len(m.ProductCategoriesWooByID))
-	logger.Infof("Длина списка ProductCategoriesWooBySlug = %d\n", len(m.ProductCategoriesWooBySlug))
+	logger.Debugf("Длина списка ProductCategoriesWooByID = %d\n", len(m.ProductCategoriesWooByID))
+	logger.Debugf("Длина списка ProductCategoriesWooBySlug = %d\n", len(m.ProductCategoriesWooBySlug))
 
 	return nil
 }
@@ -401,8 +426,8 @@ func (m *menu) RefreshProductCategories() error {
 func (m *menu) RefreshMenu() error {
 
 	logger := logging.GetLogger()
-	logger.Info("Start RefreshMenu")
-	defer logger.Info("End RefreshMenu")
+	logger.Debug("Start RefreshMenu")
+	defer logger.Debug("End RefreshMenu")
 
 	err := m.RefreshMenuitems()
 	if err != nil {
@@ -429,16 +454,16 @@ func (m *menu) RefreshMenu() error {
 
 func NewCacheMenu() (Menu, error) {
 	logger := logging.GetLogger()
-	logger.Info("Start NewCacheMenu")
-	defer logger.Info("End NewCacheMenu")
+	logger.Debug("Start NewCacheMenu")
+	defer logger.Debug("End NewCacheMenu")
 	cacheMenuGlobal = menu{}
 	return &cacheMenuGlobal, nil
 }
 
 func GetMenu() (Menu, error) {
 	logger := logging.GetLogger()
-	logger.Info("Start GetMenu")
-	defer logger.Info("End GetMenu")
+	logger.Debug("Start GetMenu")
+	defer logger.Debug("End GetMenu")
 
 	return &cacheMenuGlobal, nil
 }
