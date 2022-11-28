@@ -1,5 +1,7 @@
 package database
 
+import "database/sql"
+
 type Version struct {
 	ID      int    `db:"ID"`
 	Name    string `db:"Name"`
@@ -21,10 +23,15 @@ type Order struct {
 }
 
 type Menuitem struct {
-	ID             int    `db:"ID"`
-	Ident          int    `db:"IdentRK"`
-	IMAGE_MOD_TIME string `db:"ImageModTime"`
+	ID               int            `db:"ID"`
+	Ident            int            `db:"IdentRK"`
+	IMAGE_MOD_TIME_1 sql.NullString `db:"ImageModTime1"`
+	IMAGE_NAME_1     sql.NullString `db:"ImageName1"`
+	IMAGE_MOD_TIME_2 sql.NullString `db:"ImageModTime2"`
+	IMAGE_NAME_2     sql.NullString `db:"ImageName2"`
 }
+
+const DATABASE_SELECT_MENUITEM = `SELECT ID, IdentRK, ImageModTime1, ImageName1, ImageModTime2, ImageName2 FROM Menuitem WHERE IdentRK=%d`
 
 const DB_SCHEMA = `CREATE TABLE Orders (
 	ID integer PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +56,9 @@ CREATE TABLE Version (
 CREATE TABLE Menuitem (
 	ID integer PRIMARY KEY AUTOINCREMENT,
 	IdentRK integer,
-	ImageModTime text
+	ImageModTime1 text,
+	ImageName1 text,
+	ImageModTime2 text,
+	ImageName2 text
 );
 `

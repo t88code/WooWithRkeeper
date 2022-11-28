@@ -22,17 +22,6 @@ import (
 	"time"
 )
 
-type productImage struct {
-	Id              int    `json:"id"`
-	DateCreated     string `json:"date_created"`
-	DateCreatedGmt  string `json:"date_created_gmt"`
-	DateModified    string `json:"date_modified"`
-	DateModifiedGmt string `json:"date_modified_gmt"`
-	Src             string `json:"src"`
-	Name            string `json:"name"`
-	Alt             string `json:"alt"`
-}
-
 type menuitemError struct {
 	*modelsRK7API.MenuitemItem
 	errorText string
@@ -77,53 +66,37 @@ func SyncImages() error {
 		return err
 	}
 
-	if len(menuitems) == 0 {
-		err = menu.RefreshMenuitems()
-		if err != nil {
-			return err
-		}
-		menuitems, err = menu.GetMenuitems()
-		if err != nil {
-			return err
-		}
-	}
-
 	productsWooByID, err := menu.GetProductsWooByID()
 	if err != nil {
 		return err
 	}
 
-	if len(productsWooByID) == 0 {
-		err = menu.RefreshProducts()
-		if err != nil {
-			return err
-		}
-
-		productsWooByID, err = menu.GetProductsWooByID()
-		if err != nil {
-			return err
-		}
+	dishRestsByIdent, err := menu.GetDishRestsByIdent()
+	if err != nil {
+		return err
 	}
 
 	logger.Debug("Запущен процесс обновления картинок блюд")
 
 	// блюда RK7
-	var menuitemsActive int                                  // активные
-	var menuitemsNotActive int                               // не активные
-	var menuitemsPriceNotDefine []*modelsRK7API.MenuitemItem // не указана цена - do Отправить сообщение
+	var menuitemsActive int                                                  // активные
+	var menuitemsNotActive int                                               // не активные
+	var menuitemsPriceNotDefineStopListNoneSync []*modelsRK7API.MenuitemItem // не указана цена - do Отправить сообщение
 
 	var menuitemsFoundInWoo []*modelsRK7API.MenuitemItem    // найдено в WOO
 	var menuitemsNotFoundInWoo []*modelsRK7API.MenuitemItem // не найдено в WOO - do Отправить сообщение
 
 	var menuitemsWooIsNull []*modelsRK7API.MenuitemItem     // WooID не указан - do Отправить сообщение
-	var menuitemsImageNameNull []*modelsRK7API.MenuitemItem // WooImageName не указан  - do Отправить сообщение и обнулить картинку в WOO
+	var menuitemsImageNameNull []*modelsRK7API.MenuitemItem // WooImageName не указан - do Отправить сообщение и обнулить картинку в WOO
 	var menuitemsImageNotFound []*modelsRK7API.MenuitemItem // WooImageName указан, но картинка не найдена - do Отправить сообщение и обнулить картинку в WOO
-	var menuitemsNonJpgFile []*modelsRK7API.MenuitemItem    // картинка формата не jpg - todo сообщить
+	var menuitemsNonJpgFile []*modelsRK7API.MenuitemItem    // картинка формата не jpg - do сообщить
 
-	var menuitemsNeedUpdateInWooByDate []*modelsRK7API.MenuitemItem   // дата картинки изменилась - do Обновить/создать картинку в WOO
-	var menuitemsNoNeedUpdateInWooByDate []*modelsRK7API.MenuitemItem // дата картинки не изменилась - do Проверить картинку в WOO
+	//картинка найдена в папке и в WOO
+	var menuitemsNeedUpdateInWooByName []*modelsRK7API.MenuitemItem       // наименование картинки изменилась - do Обновить/создать картинку в WOO --todo Проверить наличие 2й картинки
+	var menuitemsNeedUpdateInWooByDate []*modelsRK7API.MenuitemItem       // дата картинки изменилась - do Обновить/создать картинку в WOO --todo Проверить наличие 2й картинки
+	var menuitemsNoNeedUpdateNeedVerifyInWoo []*modelsRK7API.MenuitemItem // дата картинки не изменилась, наименование совпадает - do Проверить наличие картинки в WOO --todo Проверить наличие 2й картинки
 
-	var menuitemsNeedAddInDB []*modelsRK7API.MenuitemItem // нет записи в DB - do Обновить/создать картинку в WOO и добавить запись в DB
+	var menuitemsNeedAddInDB []*modelsRK7API.MenuitemItem // нет записи в DB - do Обновить/создать картинку в WOO и добавить запись в DB --todo Проверить наличие 2й картинки
 	var menuitemsDubleInDB []*modelsRK7API.MenuitemItem   // дубли в DB - do Отправить сообщение
 
 LoopOneStage:
@@ -144,11 +117,19 @@ LoopOneStage:
 			logger.Debug("Не активное блюдо. Пропускаем. Синхронизация меню отключила блюдо в WOO")
 			menuitemsNotActive++
 		} else {
-			logger.Debug("Блюдо активное. Проверяем цену")
+			logger.Debug("Блюдо активное. Проверяем цену и стоп-лист")
 			menuitemsActive++
-			if menuitem.PRICETYPES == 9223372036854775807 {
-				logger.Debug("Блюдо без указанной цены. Сообщаем и пропускаем.")
-				menuitemsPriceNotDefine = append(menuitemsPriceNotDefine, menuitems[i])
+			logger.Debug("Проверяем наличие в стоп-листе")
+			dishInStopList := false
+			if dishRests, foundInStopList := dishRestsByIdent[menuitem.Ident]; foundInStopList {
+				if dishRests.Prohibited == 1 || dishRests.Quantity == 0 {
+					dishInStopList = true
+					logger.Debug("Блюдо в стоп-листе")
+				}
+			}
+			if menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW || dishInStopList {
+				logger.Debug("Блюдо без указанной цены или в стоп-листе или с выключенной синхронизацией. Сообщаем и пропускаем.")
+				menuitemsPriceNotDefineStopListNoneSync = append(menuitemsPriceNotDefineStopListNoneSync, menuitems[i])
 			} else {
 				if _, found := productsWooByID[menuitem.WOO_ID]; found {
 					logger.Debug("Блюдо найдено в WOO. Проверяем наименование картинки")
@@ -167,23 +148,30 @@ LoopOneStage:
 							if matchJPG {
 								logger.Debug("Сверяем дату изменения c сохраненной в DB")
 								var menuitemDBs []database.Menuitem
-								query := fmt.Sprintf(`SELECT ID, IdentRK, ImageModTime FROM Menuitem WHERE IdentRK=%d`, menuitem.ItemIdent)
+								query := fmt.Sprintf(database.DATABASE_SELECT_MENUITEM, menuitem.ItemIdent)
 								err = db.Select(&menuitemDBs, query)
 								if err != nil {
 									return errors.Wrapf(err, "failed SELECT to dbsqlite; dish %s", dish)
 								} else {
-									if len(menuitemDBs) > 0 {
-										logger.Debug("Блюдо найдено в DB. Сверяем дату изменения.")
-										modTimeFile := fileInfo.ModTime().Format(time.RFC3339)
-										modTimeDB := menuitemDBs[0].IMAGE_MOD_TIME
-										logger.Debugf("Дата изменения картинки в папке: %s", modTimeFile)
-										logger.Debugf("Дата изменения картинки в DB: %s", modTimeDB)
-										if modTimeFile != modTimeDB {
-											logger.Debug("Дата изменения картинки изменилась. Необходимо обновить картинку")
-											menuitemsNeedUpdateInWooByDate = append(menuitemsNeedUpdateInWooByDate, menuitems[i])
+									if len(menuitemDBs) == 1 {
+										logger.Debug("Блюдо найдено в DB. Сверяем имя и дату изменения.")
+										logger.Debugf("Сверяем имя: DB=%s, RK7=%s, File=%s", menuitemDBs[0].IMAGE_NAME_1, menuitem.WOO_IMAGE_NAME, fileInfo.Name())
+										if menuitemDBs[0].IMAGE_NAME_1.String != menuitem.WOO_IMAGE_NAME {
+											logger.Debug("Наименование картинки изменилось. Обновляем картинку в WOO")
+											menuitemsNeedUpdateInWooByName = append(menuitemsNeedUpdateInWooByName, menuitems[i])
 										} else {
-											logger.Debug("Дата изменения картинки не изменилась. Сверяем наименование картинки между WOO и RK7")
-											menuitemsNoNeedUpdateInWooByDate = append(menuitemsNoNeedUpdateInWooByDate, menuitems[i])
+											logger.Debug("Наименование картинки не изменилось. Сверяем дату изменения.")
+											modTimeFile := fileInfo.ModTime().Format(time.RFC3339)
+											modTimeDB := menuitemDBs[0].IMAGE_MOD_TIME_1.String
+											logger.Debugf("Дата изменения картинки в папке: %s", modTimeFile)
+											logger.Debugf("Дата изменения картинки в DB: %s", modTimeDB)
+											if modTimeFile != modTimeDB {
+												logger.Debug("Дата изменения картинки изменилась. Необходимо обновить картинку")
+												menuitemsNeedUpdateInWooByDate = append(menuitemsNeedUpdateInWooByDate, menuitems[i])
+											} else {
+												logger.Debug("Дата изменения картинки не изменилась. Наименование не изменилось. Необходимо проверить наличие в WOO")
+												menuitemsNoNeedUpdateNeedVerifyInWoo = append(menuitemsNoNeedUpdateNeedVerifyInWoo, menuitems[i])
+											}
 										}
 									} else if len(menuitemDBs) > 1 {
 										errText := fmt.Sprintf("Недопустимое количество блюд в DB = %d > 1", len(menuitemDBs))
@@ -223,35 +211,41 @@ LoopOneStage:
 
 	logger.Debug("Блюда RK7:")
 	logger.Debugf("Всего: %d", len(menuitems))
-	logger.Debugf("Активные: %d", menuitemsActive)                                //++
-	logger.Debugf("Не активные: %d", menuitemsNotActive)                          //++
-	logger.Debugf("Не указана цена - сообщаем: %d", len(menuitemsPriceNotDefine)) //++
+	logger.Debugf("Активные: %d", menuitemsActive)                                                                           //++
+	logger.Debugf("Не активные: %d", menuitemsNotActive)                                                                     //++
+	logger.Debugf("Не указана цена/синк выключен/в стоп-листе - сообщаем: %d", len(menuitemsPriceNotDefineStopListNoneSync)) //++
 	logger.Debugf("Игнорировано: %d", len(cfg.RK7.MenuitemIdentIgnore))
 
 	logger.Debugf("Блюда найдено в WOO: %d", len(menuitemsFoundInWoo))                  //++
 	logger.Debugf("Блюдо не найдено в WOO - сообщить: %d", len(menuitemsNotFoundInWoo)) //++
 	logger.Debugf("Блюдо без WOO_ID - сообщить: %d", len(menuitemsWooIsNull))           //++
 
-	logger.Debugf("Необходимо сообщить и обнулить картинку в WOO, причина - пустое поле WOO_IMAGE_NAME: %d", len(menuitemsImageNameNull))                //++
+	logger.Debugf("Необходимо сообщить и обнулить картинку в WOO, причина - пустое поле WOO_IMAGE_NAME: %d", len(menuitemsImageNameNull)) //++
+	for _, item := range menuitemsImageNameNull {
+		fmt.Println(item)
+	}
+
 	logger.Debugf("Необходимо сообщить и обнулить картинку в WOO, причина - есть поле WOO_IMAGE_NAME, но нет картинки: %d", len(menuitemsImageNotFound)) //++
 	logger.Debugf("Необходимо сообщить в WOO, причина - картинка формата не jpg: %d", len(menuitemsNonJpgFile))
 
-	logger.Debugf("Необходимо обновить картинку в WOO, причина - дата изменилась: %d", len(menuitemsNeedUpdateInWooByDate))       //++++
-	logger.Debugf("Необходимо проверить картинку в WOO, причина - дата не изменилась: %d", len(menuitemsNoNeedUpdateInWooByDate)) //++
-	logger.Debugf("Необходимо обновить картинку в WOO, причина - нет записи в DB: %d", len(menuitemsNeedAddInDB))                 //++
-	logger.Debugf("Дубли в DB - сообщить: %d", len(menuitemsDubleInDB))                                                           //++
+	logger.Debugf("Необходимо обновить картинку в WOO, причина - наименование изменилось: %d", len(menuitemsNeedUpdateInWooByName)) //++++
+	logger.Debugf("Необходимо обновить картинку в WOO, причина - дата изменилась: %d", len(menuitemsNeedUpdateInWooByDate))         //++++
+
+	logger.Debugf("Необходимо проверить картинку в WOO, причина - дата не изменилась, наименование картинки не изменилось: %d", len(menuitemsNoNeedUpdateNeedVerifyInWoo)) //++
+
+	logger.Debugf("Необходимо обновить картинку в WOO, причина - нет записи в DB: %d", len(menuitemsNeedAddInDB)) //++
+	logger.Debugf("Дубли в DB - сообщить: %d", len(menuitemsDubleInDB))                                           //++
 
 	//++++++
-	if len(menuitemsPriceNotDefine) > 0 {
-		logger.Debugf("Найдены блюда без цены, отправляем сообщение")
-		resultSyncAll = append(resultSyncAll, "<strong>Блюда RK7 без цены:</strong>")
-		for _, menuitem := range menuitemsPriceNotDefine {
+	if len(menuitemsPriceNotDefineStopListNoneSync) > 0 {
+		logger.Debugf("Найдены блюда без цены или выключен синк или в стоп-листе, отправляем сообщение")
+		resultSyncAll = append(resultSyncAll, "<strong>Блюда RK7 без цены или выключен синк или в стоп-листе:</strong>")
+		for _, menuitem := range menuitemsPriceNotDefineStopListNoneSync {
 			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
 				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
 			resultSyncAll = append(resultSyncAll, dish)
 		}
 	}
-
 	//++++++
 	if len(menuitemsNotFoundInWoo) > 0 {
 		logger.Debugf("Блюда не найдены в WOO, отправляем сообщение")
@@ -264,8 +258,7 @@ LoopOneStage:
 			resultSyncError = append(resultSyncError, dish)
 		}
 	}
-
-	//++++
+	//++++++
 	if len(menuitemsWooIsNull) > 0 {
 		logger.Debugf("Блюда RK7, WOO_ID не указан, отправляем сообщение")
 		resultSyncAll = append(resultSyncAll, "<strong>Блюда RK7, WOO_ID не указан:</strong>")
@@ -276,10 +269,13 @@ LoopOneStage:
 		}
 	}
 
-	//++++
+	//++++++
 	if len(menuitemsImageNameNull) > 0 {
-		logger.Debugf("Блюда RK7, WOO_IMAGE_NAME не указан, обнуляем в WOO и отправляем сообщение")
+		logger.Debugf("Блюда RK7, WOO_IMAGE_NAME не указан, обнуляем в WOO и отправляем сообщение") // todo проверить обнуление
 		resultSyncAll = append(resultSyncAll, "<strong>Блюда RK7, WOO_IMAGE_NAME не указан:</strong>")
+		var mErrors []string
+		mErrors = append(mErrors, "<strong>Блюда RK7, WOO_IMAGE_NAME не указан:</strong>")
+
 		for i, menuitem := range menuitemsImageNameNull {
 			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
 				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
@@ -287,19 +283,23 @@ LoopOneStage:
 			err := NulledImageInWoo(menuitemsImageNameNull[i])
 			if err != nil {
 				messageText = fmt.Sprintf("%s; Не удалось обнулить в WOO: %v", dish, err)
+				mErrors = append(mErrors, messageText)
+				logger.Error(messageText)
 			} else {
 				messageText = fmt.Sprintf("%s; Успешно обнулено в WOO", dish)
+				logger.Debug(messageText)
 			}
 			resultSyncAll = append(resultSyncAll, messageText)
 		}
+		if len(mErrors) > 1 {
+			resultSyncError = append(resultSyncError, mErrors...)
+		}
 	}
-
-	//++++
+	//++++++
 	if len(menuitemsImageNotFound) > 0 {
 		logger.Debugf("Блюда RK7, WOO_IMAGE_NAME указан, картинка не найдена в папке, обнуляем в WOO и отправляем сообщение")
 		resultSyncAll = append(resultSyncAll, "<strong>Блюда RK7, картинки не найдены в папке:</strong>")
 		resultSyncError = append(resultSyncError, "<strong>Блюда RK7, картинки не найдены в папке:</strong>")
-
 		for i, menuitem := range menuitemsImageNotFound {
 			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
 				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
@@ -307,106 +307,119 @@ LoopOneStage:
 			err := NulledImageInWoo(menuitemsImageNotFound[i])
 			if err != nil {
 				messageText = fmt.Sprintf("%s; Не удалось обнулить в WOO: %v", dish, err)
+				resultSyncError = append(resultSyncError, messageText)
+				logger.Error(messageText)
 			} else {
 				messageText = fmt.Sprintf("%s; Успешно обнулено в WOO", dish)
+				logger.Debug(messageText)
 			}
 			resultSyncAll = append(resultSyncAll, messageText)
-			resultSyncError = append(resultSyncError, messageText)
 		}
 	}
 
-	//++++
-	if len(menuitemsNeedUpdateInWooByDate) > 0 {
-		logger.Debugf("Блюда RK7, дата картинки изменилась, обновляем/создаем картинку в WOO, кол-во %d", len(menuitemsNeedUpdateInWooByDate))
-		resultSyncAll = append(resultSyncAll, fmt.Sprintf("<strong>Блюда RK7, картинки изменились, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedUpdateInWooByDate)))
+	//++++++
+	if len(menuitemsNeedUpdateInWooByName) > 0 {
+		logger.Debugf("Блюда RK7, наименование картинки изменилась, обновляем/создаем картинку в WOO, кол-во %d", len(menuitemsNeedUpdateInWooByName))
 		var messageText string
 		var failedUpdateCount int
 		var mErrors []string
+
+		resultSyncAll = append(resultSyncAll, fmt.Sprintf("<strong>Блюда RK7, картинки изменились, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedUpdateInWooByName)))
+		mErrors = append(mErrors, fmt.Sprintf("<strong>Блюда RK7, картинки изменились, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedUpdateInWooByName)))
+		for i, menuitem := range menuitemsNeedUpdateInWooByName {
+			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
+				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
+			logger.Debug(dish)
+			err := UpdateImageInWoo(menuitemsNeedUpdateInWooByName[i])
+			if err != nil {
+				messageText = fmt.Sprintf("%s; error: %v", dish, err)
+				resultSyncAll = append(resultSyncAll, messageText)
+				mErrors = append(mErrors, messageText)
+				logger.Error(messageText)
+				failedUpdateCount++
+			} else {
+				logger.Debug("Image успешно обновлен в WOO. Обновляем запись в DB")
+				path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
+				if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
+					err := UpdateImageInDB(menuitemsNeedUpdateInWooByName[i], fileInfo.ModTime())
+					if err != nil {
+						messageText = fmt.Sprintf("%s; Не удалось обновить в DB: %v", dish, err)
+						resultSyncAll = append(resultSyncAll, messageText)
+						mErrors = append(mErrors, messageText)
+						logger.Error(messageText)
+						failedUpdateCount++
+					} else {
+						messageText = "Image успешно обновлен в DB"
+						resultSyncAll = append(resultSyncAll, messageText)
+						logger.Debug(messageText)
+					}
+				} else {
+					messageText = fmt.Sprintf("%s; Не удалось найти картинку в папке при попытке добавить в DB", dish)
+					resultSyncAll = append(resultSyncAll, messageText)
+					mErrors = append(mErrors, messageText)
+					logger.Error(messageText)
+					failedUpdateCount++
+				}
+			}
+		}
+
+		if failedUpdateCount == 0 {
+			messageText = fmt.Sprintf("Картинки успешно обновлены в WOO, кол-во %d", len(menuitemsNeedUpdateInWooByName))
+			resultSyncAll = append(resultSyncAll, messageText)
+		} else if failedUpdateCount < len(menuitemsNeedUpdateInWooByName) {
+			messageText = fmt.Sprintf("Остальные картинки успешно обновлены в WOO, кол-во %d", len(menuitemsNeedUpdateInWooByName)-failedUpdateCount)
+			resultSyncAll = append(resultSyncAll, messageText)
+		}
+		if len(mErrors) > 1 {
+			resultSyncError = append(resultSyncError, mErrors...)
+		}
+	}
+	//++++++
+	if len(menuitemsNeedUpdateInWooByDate) > 0 {
+		logger.Debugf("Блюда RK7, дата картинки изменилась, обновляем/создаем картинку в WOO, кол-во %d", len(menuitemsNeedUpdateInWooByDate))
+		var messageText string
+		var failedUpdateCount int
+		var mErrors []string
+
+		resultSyncAll = append(resultSyncAll, fmt.Sprintf("<strong>Блюда RK7, картинки изменились, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedUpdateInWooByDate)))
 		mErrors = append(mErrors, fmt.Sprintf("<strong>Блюда RK7, картинки изменились, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedUpdateInWooByDate)))
 		for i, menuitem := range menuitemsNeedUpdateInWooByDate {
 			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
 				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
-			err := CheckImageInWoo(menuitemsNeedUpdateInWooByDate[i])
+			logger.Debug(dish)
+			err := UpdateImageInWoo(menuitemsNeedUpdateInWooByDate[i])
 			if err != nil {
-				switch err.Error() {
-				case ERROR_IMAGE_NOT_FOUND_IN_WOO:
-					messageText = fmt.Sprintf("%s; %v", dish, err)
-					mErrors = append(mErrors, messageText)
-					failedUpdateCount++
-				case ERROR_IMAGE_NOT_FOUND_IN_WOO_IMAGE:
-					err = AddImageInWoo(menuitemsNeedUpdateInWooByDate[i])
+				messageText = fmt.Sprintf("%s; error: %v", dish, err)
+				resultSyncAll = append(resultSyncAll, messageText)
+				mErrors = append(mErrors, messageText)
+				logger.Error(messageText)
+				failedUpdateCount++
+			} else {
+				logger.Debug("Image успешно обновлен в WOO. Обновляем запись в DB")
+				path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
+				if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
+					err := UpdateImageInDB(menuitemsNeedUpdateInWooByDate[i], fileInfo.ModTime())
 					if err != nil {
-						messageText = fmt.Sprintf("%s; Не удалось создать в Woo: %v", dish, err)
+						messageText = fmt.Sprintf("%s; Не удалось обновить в DB: %v", dish, err)
+						resultSyncAll = append(resultSyncAll, messageText)
 						mErrors = append(mErrors, messageText)
+						logger.Error(messageText)
 						failedUpdateCount++
 					} else {
-						logger.Debug("Image успешно создан в Woo. Обновляем запись в DB")
-						path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
-						if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
-							err := UpdateImageInDB(menuitemsNeedUpdateInWooByDate[i], fileInfo.ModTime())
-							if err != nil {
-								messageText = fmt.Sprintf("%s; Не удалось обновить в DB: %v", dish, err)
-								mErrors = append(mErrors, messageText)
-								failedUpdateCount++
-							} else {
-								messageText = "Image успешно обновлен в DB"
-								logger.Debug(messageText)
-								resultSyncAll = append(resultSyncAll, messageText)
-								continue
-							}
-						} else {
-							messageText = fmt.Sprintf("%s; Не удалось найти картинку в папке ", dish)
-							mErrors = append(mErrors, messageText)
-							failedUpdateCount++
-						}
+						messageText = "Image успешно обновлен в DB"
+						resultSyncAll = append(resultSyncAll, messageText)
+						logger.Debug(messageText)
 					}
-				case ERROR_IMAGE_CHECK_UNDEFINE:
-					messageText = fmt.Sprintf("%s; %v", dish, err)
-					mErrors = append(mErrors, messageText)
-					failedUpdateCount++
-				case ERROR_IMAGE_CHECK_ERROR_CAST:
-					messageText = fmt.Sprintf("%s; %v", dish, err)
-					mErrors = append(mErrors, messageText)
-					failedUpdateCount++
-				default:
-					messageText = fmt.Sprintf("%s; %s", dish, "Неизвестная ошибка")
-					mErrors = append(mErrors, messageText)
-					failedUpdateCount++
-				}
-				resultSyncAll = append(resultSyncAll, messageText)
-				logger.Debug(messageText)
-			} else {
-				logger.Debug("Картинка существует, обновляем")
-				err = UpdateImageInWoo(menuitemsNeedUpdateInWooByDate[i])
-				if err != nil {
-					messageText = fmt.Sprintf("%s; Не удалось обновить в WOO: %v", dish, err)
-					logger.Error(messageText)
-					mErrors = append(mErrors, messageText)
-					failedUpdateCount++
 				} else {
-					logger.Debug("Image успешно обновлен в WOO. Обновляем запись в DB")
-					path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
-					if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
-						err := UpdateImageInDB(menuitemsNeedUpdateInWooByDate[i], fileInfo.ModTime())
-						if err != nil {
-							messageText = fmt.Sprintf("%s; Не удалось обновить в DB: %v", dish, err)
-							mErrors = append(mErrors, messageText)
-							failedUpdateCount++
-						} else {
-							messageText = "Image успешно обновлен в DB"
-							logger.Debug(messageText)
-							resultSyncAll = append(resultSyncAll, messageText)
-							continue
-						}
-					} else {
-						messageText = fmt.Sprintf("%s; Не удалось найти картинку в папке ", dish)
-						mErrors = append(mErrors, messageText)
-					}
+					messageText = fmt.Sprintf("%s; Не удалось найти картинку в папке при попытке добавить в DB", dish)
+					resultSyncAll = append(resultSyncAll, messageText)
+					mErrors = append(mErrors, messageText)
+					logger.Error(messageText)
+					failedUpdateCount++
 				}
-				resultSyncAll = append(resultSyncAll, messageText)
-				logger.Debug(messageText)
 			}
 		}
+
 		if failedUpdateCount == 0 {
 			messageText = fmt.Sprintf("Картинки успешно обновлены в WOO, кол-во %d", len(menuitemsNeedUpdateInWooByDate))
 			resultSyncAll = append(resultSyncAll, messageText)
@@ -419,19 +432,19 @@ LoopOneStage:
 		}
 	}
 
-	//++++
-	if len(menuitemsNoNeedUpdateInWooByDate) > 0 {
-		logger.Debugf("Блюда RK7, дата картинки не изменилась, проверяем в WOO, что картинка существует, кол-во %d", len(menuitemsNoNeedUpdateInWooByDate))
+	//+++++-
+	if len(menuitemsNoNeedUpdateNeedVerifyInWoo) > 0 {
+		logger.Debugf("Блюда RK7, дата картинки не изменилась, наименование не изменилось, проверяем в WOO, что картинка существует, кол-во %d", len(menuitemsNoNeedUpdateNeedVerifyInWoo))
 
 		var messageText string
 		var failedUpdateCount int
 
 		var mErrors []string
-		mErrors = append(mErrors, fmt.Sprintf("<strong>Блюда RK7, дата картинок не изменилась, проверяем в WOO, кол-во %d:</strong>", len(menuitemsNoNeedUpdateInWooByDate)))
-		for i, menuitem := range menuitemsNoNeedUpdateInWooByDate {
+		mErrors = append(mErrors, fmt.Sprintf("<strong>Блюда RK7, дата картинок/наименование не изменилась, проверяем в WOO, кол-во %d:</strong>", len(menuitemsNoNeedUpdateNeedVerifyInWoo)))
+		for i, menuitem := range menuitemsNoNeedUpdateNeedVerifyInWoo {
 			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
 				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
-			err := CheckImageInWoo(menuitemsNoNeedUpdateInWooByDate[i])
+			err := CheckImageInWoo(menuitemsNoNeedUpdateNeedVerifyInWoo[i])
 			if err != nil {
 				switch err.Error() {
 				case ERROR_IMAGE_NOT_FOUND_IN_WOO:
@@ -439,7 +452,7 @@ LoopOneStage:
 					mErrors = append(mErrors, messageText)
 					failedUpdateCount++
 				case ERROR_IMAGE_NOT_FOUND_IN_WOO_IMAGE:
-					err = AddImageInWoo(menuitemsNoNeedUpdateInWooByDate[i])
+					err = AddImageInWoo(menuitemsNoNeedUpdateNeedVerifyInWoo[i])
 					if err != nil {
 						messageText = fmt.Sprintf("%s; Не удалось создать в WOO: %v", dish, err)
 						mErrors = append(mErrors, messageText)
@@ -448,7 +461,7 @@ LoopOneStage:
 						logger.Debug("Image успешно создан в Woo. Обновляем запись в DB")
 						path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
 						if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
-							err := UpdateImageInDB(menuitemsNoNeedUpdateInWooByDate[i], fileInfo.ModTime())
+							err := UpdateImageInDB(menuitemsNoNeedUpdateNeedVerifyInWoo[i], fileInfo.ModTime())
 							if err != nil {
 								messageText = fmt.Sprintf("%s; Не удалось обновить в DB: %v", dish, err)
 								mErrors = append(mErrors, messageText)
@@ -488,11 +501,11 @@ LoopOneStage:
 		}
 
 		if failedUpdateCount == 0 {
-			messageText = fmt.Sprintf("Картинки успешно проверены в WOO, кол-во %d", len(menuitemsNoNeedUpdateInWooByDate))
-		} else if failedUpdateCount < len(menuitemsNoNeedUpdateInWooByDate) {
-			messageText = fmt.Sprintf("Остальные картинки успешно проверены в WOO, кол-во %d", len(menuitemsNoNeedUpdateInWooByDate)-failedUpdateCount)
-		} else if failedUpdateCount == len(menuitemsNoNeedUpdateInWooByDate) {
-			messageText = fmt.Sprintf("Ни одна картинка не проверена в WOO, кол-во %d", len(menuitemsNoNeedUpdateInWooByDate)-failedUpdateCount)
+			messageText = fmt.Sprintf("Картинки успешно проверены в WOO, кол-во %d", len(menuitemsNoNeedUpdateNeedVerifyInWoo))
+		} else if failedUpdateCount < len(menuitemsNoNeedUpdateNeedVerifyInWoo) {
+			messageText = fmt.Sprintf("Остальные картинки успешно проверены в WOO, кол-во %d", len(menuitemsNoNeedUpdateNeedVerifyInWoo)-failedUpdateCount)
+		} else if failedUpdateCount == len(menuitemsNoNeedUpdateNeedVerifyInWoo) {
+			messageText = fmt.Sprintf("Ни одна картинка не проверена в WOO, кол-во %d", len(menuitemsNoNeedUpdateNeedVerifyInWoo)-failedUpdateCount)
 		} else {
 			messageText = "Неизвестная ошибка при проверке картинки в WOO"
 		}
@@ -500,7 +513,7 @@ LoopOneStage:
 		resultSyncAll = append(resultSyncAll, messageText)
 	}
 
-	//++++
+	//++++++
 	if len(menuitemsNeedAddInDB) > 0 {
 		logger.Debugf("Блюда RK7, нет записи в БД, обновляем/создаем картинку в WOO и добавляем запись в DB, кол-во %d", len(menuitemsNeedAddInDB))
 		resultSyncAll = append(resultSyncAll, fmt.Sprintf("<strong>Блюда RK7, нет записи в DB, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedAddInDB)))
@@ -509,90 +522,56 @@ LoopOneStage:
 
 		var mErrors []string
 		mErrors = append(mErrors, fmt.Sprintf("<strong>Блюда RK7, нет записи в DB, обновляем в WOO, кол-во %d:</strong>", len(menuitemsNeedAddInDB)))
-
 		for i, menuitem := range menuitemsNeedAddInDB {
 			dish := fmt.Sprintf("Блюдо RK7: Name: %s, LongName: %s, RK_ID: %d, RK_WOO_ID: %d, RK_WOO_PARENT_ID: %d, RK7_Status: %d, RK_Price: %d, RK_Image: %s",
 				menuitem.Name, menuitem.WOO_LONGNAME, menuitem.ItemIdent, menuitem.WOO_ID, menuitem.WOO_PARENT_ID, menuitem.Status, menuitem.PRICETYPES, menuitem.WOO_IMAGE_NAME)
-			logger.Debug("Обновляем картинку в DB")
-			path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
-			if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
-				err := UpdateImageInDB(menuitemsNeedAddInDB[i], fileInfo.ModTime())
-				if err != nil {
-					failedUpdateCount++
-					messageText = fmt.Sprintf("Не удалось обновить картинку в DB; %s; %v", dish, err)
-					mErrors = append(mErrors, messageText)
-				} else {
-					logger.Debug("Успешно обновлена картинка в DB")
-					logger.Debug("Приступаем к добавлению картинки в WOO")
-					err := CheckImageInWoo(menuitemsNeedAddInDB[i])
+			logger.Debug(dish)
+			err := UpdateImageInWoo(menuitemsNeedAddInDB[i])
+			if err != nil {
+				messageText = fmt.Sprintf("%s; error: %v", dish, err)
+				resultSyncAll = append(resultSyncAll, messageText)
+				mErrors = append(mErrors, messageText)
+				logger.Error(messageText)
+				failedUpdateCount++
+			} else {
+				logger.Debug("Image успешно обновлен в WOO. Обновляем запись в DB")
+				path := fmt.Sprintf("%s%s", cfg.IMAGESYNC.Path, menuitem.WOO_IMAGE_NAME)
+				if fileInfo, err := os.Stat(path); !os.IsNotExist(err) {
+					err := UpdateImageInDB(menuitemsNeedAddInDB[i], fileInfo.ModTime())
 					if err != nil {
-						switch err.Error() {
-						case ERROR_IMAGE_NOT_FOUND_IN_WOO:
-							messageText = fmt.Sprintf("%s; %v", dish, err)
-							failedUpdateCount++
-							mErrors = append(mErrors, messageText)
-						case ERROR_IMAGE_NOT_FOUND_IN_WOO_IMAGE:
-							err = AddImageInWoo(menuitemsNeedAddInDB[i])
-							if err != nil {
-								messageText = fmt.Sprintf("%s; Не удалось создать картинку в WOO: %v", dish, err)
-								failedUpdateCount++
-								mErrors = append(mErrors, messageText)
-							} else {
-								logger.Debug("Image успешно создан в WOO")
-								messageText = fmt.Sprintf("%s; Картинка успешно добавлена в WOO: %v", dish, err)
-							}
-						case ERROR_IMAGE_CHECK_UNDEFINE:
-							messageText = fmt.Sprintf("%s; %v", dish, err)
-							failedUpdateCount++
-							mErrors = append(mErrors, messageText)
-						case ERROR_IMAGE_CHECK_ERROR_CAST:
-							messageText = fmt.Sprintf("%s; %v", dish, err)
-							failedUpdateCount++
-							mErrors = append(mErrors, messageText)
-						default:
-							messageText = fmt.Sprintf("%s; %s", dish, "Неизвестная ошибка")
-							failedUpdateCount++
-							mErrors = append(mErrors, messageText)
-						}
+						messageText = fmt.Sprintf("%s; Не удалось обновить в DB: %v", dish, err)
+						resultSyncAll = append(resultSyncAll, messageText)
+						mErrors = append(mErrors, messageText)
+						logger.Error(messageText)
+						failedUpdateCount++
+					} else {
+						messageText = "Image успешно обновлен в DB"
 						resultSyncAll = append(resultSyncAll, messageText)
 						logger.Debug(messageText)
-					} else {
-						logger.Debug("Картинка существует, обновляем")
-						err = UpdateImageInWoo(menuitemsNeedAddInDB[i])
-						if err != nil {
-							messageText = fmt.Sprintf("%s; Не удалось обновить в WOO: %v", dish, err)
-							logger.Error(messageText)
-							resultSyncAll = append(resultSyncAll, messageText)
-							failedUpdateCount++
-							mErrors = append(mErrors, messageText)
-						} else {
-							logger.Debug("Image успешно обновлен в WOO")
-						}
 					}
+				} else {
+					messageText = fmt.Sprintf("%s; Не удалось найти картинку в папке при попытке добавить в DB", dish)
+					resultSyncAll = append(resultSyncAll, messageText)
+					mErrors = append(mErrors, messageText)
+					logger.Error(messageText)
+					failedUpdateCount++
 				}
-			} else {
-				messageText = fmt.Sprintf("%s; Не удалось найти картинку в папке ", dish)
-				mErrors = append(mErrors, messageText)
-				resultSyncAll = append(resultSyncAll, messageText)
 			}
 		}
 
 		if failedUpdateCount == 0 {
 			messageText = fmt.Sprintf("Картинки успешно обновлены в WOO, кол-во %d", len(menuitemsNeedAddInDB))
+			resultSyncAll = append(resultSyncAll, messageText)
 		} else if failedUpdateCount < len(menuitemsNeedAddInDB) {
 			messageText = fmt.Sprintf("Остальные картинки успешно обновлены в WOO, кол-во %d", len(menuitemsNeedAddInDB)-failedUpdateCount)
-		} else {
-			messageText = fmt.Sprintf("Ни одна картинка не обновлена, кол-во %d", len(menuitemsNeedAddInDB))
+			resultSyncAll = append(resultSyncAll, messageText)
 		}
-		resultSyncAll = append(resultSyncAll, messageText)
-
 		if len(mErrors) > 1 {
 			resultSyncError = append(resultSyncError, mErrors...)
 		}
-
 	}
 
-	//++++
+	//++++++
 	if len(menuitemsDubleInDB) > 0 {
 		logger.Debugf("Блюда RK7, имеются дубли в DB, отправляем сообщение")
 		resultSyncAll = append(resultSyncAll, "<strong>Блюда RK7, имеются дубли в DB, некорректная ситуация:</strong>")
@@ -605,7 +584,7 @@ LoopOneStage:
 		}
 	}
 
-	//++++
+	//++++++
 	if len(menuitemsNonJpgFile) > 0 {
 		logger.Debugf("Картинки формата не jpg")
 		resultSyncAll = append(resultSyncAll, "<strong>Картинки формата не jpg:</strong>")
@@ -630,14 +609,11 @@ LoopOneStage:
 		if cfg.MENUSYNC.TelegramReport == 1 {
 			telegram.SendMessageToTelegramWithLogError("Cинхронизация картинок завершилась успешно")
 		}
-
 	}
 	return nil
 }
 
 func NulledImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
-	//todo
-
 	logger := logging.GetLogger()
 	logger.Debug("Start NulledImageInWoo")
 	defer logger.Debug("End NulledImageInWoo")
@@ -661,25 +637,20 @@ func NulledImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
 		} else {
 			for _, image := range productsWooByID[menuitem.WOO_ID].Images {
 				logger.Debugf("Приступаем к удалению файла в WOO ID=%d", image.Id)
-				//status, _ := SendDeleteRequest(fmt.Sprintf("http://new.hotelslovakia.ru/wp-json/wp/v2/media/%d", image.Id)) //todo url
-				status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, image.Id)) //todo url
+				status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, image.Id))
 				switch status {
-				case "201 Created":
-					logger.Debug("Картинка создана!")
-					os.Exit(44) // todo
 				case "200 OK":
 					logger.Debug("Картинка удалена!")
 					logger.Debug("Обнуляем запись в DB")
 					err := NulledImageInDB(menuitem)
 					if err != nil {
-						logger.Errorf("Ошибка при обнулении записи в DB; %v", err) // todo errors везде
-						return err
+						return errors.Wrap(err, "Ошибка при обнулении записи в DB")
 					} else {
 						logger.Debug("Обнулена запись в DB")
 						return nil
 					}
 				default:
-					os.Exit(23) // todo
+					return errors.New(fmt.Sprintf("Ошибка при попытке удалить запись из DB; status: %s", status))
 				}
 			}
 		}
@@ -732,9 +703,9 @@ func UpdateImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
 		return err
 	}
 
-	if _, found := productsWooByID[menuitem.WOO_ID]; found {
-
-		if len(productsWooByID[menuitem.WOO_ID].Images) == 0 {
+	if product, found := productsWooByID[menuitem.WOO_ID]; found {
+		if len(product.Images) == 0 {
+			logger.Debug("Картинок нет в WOO. Добавляем")
 			err := AddImageInWoo(menuitem)
 			if err != nil {
 				logger.Error("UpdateImageInWoo:Картинка не добавлена в продукт в WOO")
@@ -744,126 +715,144 @@ func UpdateImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
 				return nil
 			}
 		} else {
-			for i, image := range productsWooByID[menuitem.WOO_ID].Images {
-				logger.Debug(image)
-				//if imageMap, ok := image.(imageS); ok {
+			var findImages []models.ProductImage // картинку будут обновлены
+			var delImages []models.ProductImage  // картинки будут удалены
+
+			for _, image := range productsWooByID[menuitem.WOO_ID].Images {
+				logger.Debugf("Картинка %v", image)
 				if menuitem.WOO_IMAGE_NAME != "" {
+					logger.Debug("Выполняем поиск rkeeper картинки в WOO")
 					if image.Alt == menuitem.WOO_IMAGE_NAME {
-						logger.Debug("Картинка найдена")
-
-						id := image.Id
-
-						//productsWooByID[menuitem.WOO_ID].Images = append(productsWooByID[menuitem.WOO_ID].Images[:i], productsWooByID[menuitem.WOO_ID].Images[i+1:]...)
-
-						//todo updateImage
-
-						logger.Debug("Обновляем картинку в WOO")
-
-						//err := UpdateImageInWooAPI(menuitem, image.Id)
-						//if err != nil {
-						//	logger.Error("Картинка не обновлена в продукте в WOO")
-						//	return errors.Wrap(err, "Картинка не обновлена в продукте в WOO")
-						//} else {
-						//	logger.Debug("Картинка успешно обновлена в продукте в WOO")
-						//	return nil
-						//}
-						cfg := config.GetConfig()
-
-						logger.Debugf("Приступаем к удалению файла в WOO ID=%d", id)
-						status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, id))
-						switch status {
-						case "201 Created":
-							logger.Debug("Картинка создана!")
-						case "200 OK":
-							productsWooByID[menuitem.WOO_ID].Images = append(productsWooByID[menuitem.WOO_ID].Images[:i], productsWooByID[menuitem.WOO_ID].Images[i+1:]...)
-							logger.Debug("Картинка удалена!")
-							err := AddImageInWoo(menuitem)
-							if err != nil {
-								logger.Error("UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
-								return errors.Wrap(err, "UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
-							} else {
-								logger.Debug("Картинка успешно добавлена в продукт в WOO")
-								return nil
-							}
-						default:
-							os.Exit(2222) // todo
-						}
-
-						//api := wooapi.GetAPI()
-						//_, err := api.ProductUpdate(productsWooByID[menuitem.WOO_ID])
-						//if err != nil {
-						//	logger.Error(err, "Картинка не обновилась у продукта")
-						//	return errors.Wrapf(err, "Картинка не обновилась у продукта")
-						//} else {
-						//	logger.Debug("Картинка удалена у продукта в WOO")
-						//	logger.Debug("Приступаем к удалению файла в WOO")
-						//	status, _ := SendDeleteRequest(fmt.Sprintf("http://new.hotelslovakia.ru/wp-json/wp/v2/media/%d", id))
-						//
-						//	fmt.Println(status)
-						//	os.Exit(5)
-						//	switch status {
-						//	case "201 Created":
-						//		logger.Debug("Картинка создана!")
-						//	case "200 OK":
-						//		logger.Debug("Картинка удалена!")
-						//	default:
-						//		os.Exit(2222)
-						//	}
-						//
-						//	err := AddImageInWoo(menuitem)
-						//	if err != nil {
-						//		logger.Error("Картинка не добавлена в продукт в WOO")
-						//		return errors.Wrap(err, "Картинка не добавлена в продукт в WOO")
-						//	} else {
-						//		logger.Debug("Картинка успешно добавлена в продукт в WOO")
-						//		return nil
-						//	}
-						//}
+						logger.Debug("Картинка WOO совпадает с rkeeper")
+						findImages = append(findImages, image)
 					} else {
-						logger.Error("Не найдено имя картинки WOO_IMAGE_NAME")
-						err := AddImageInWoo(menuitem)
-						if err != nil {
-							logger.Error("Картинка не добавлена в продукт в WOO")
-							return errors.Wrap(err, "Картинка не добавлена в продукт в WOO")
-						} else {
-							logger.Debug("Картинка успешно добавлена в продукт в WOO")
-							return nil
-						}
+						logger.Debug("Картинка WOO не совпадает с rkeeper. Будет удалена позже")
+						delImages = append(delImages, image)
 					}
 				} else {
 					logger.Error("menuitem.WOO_IMAGE_NAME не указан")
 					return errors.New("menuitem.WOO_IMAGE_NAME не указан")
 				}
-
-				//} else {
-				//	logger.Debug("Ошибка приведения. Отправим сообщение об ошибке")
-				//	return errors.New(ERROR_IMAGE_CHECK_ERROR_CAST)
-				//}
 			}
-			return errors.New("Неизвестная ошибка при обновлении картинки")
+
+			cfg := config.GetConfig()
+			logger.Debug("Обнуляем WOO:IMAGES")
+			if len(findImages) > 0 {
+				logger.Debugf("Будет удалено %d картинок", len(delImages))
+				for _, image := range findImages {
+					logger.Debugf("Приступаем к удалению картинки в WOO ID=%d", image.Id)
+					status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, image.Id))
+					switch status {
+					case "200 OK":
+						logger.Debug("Картинка удалена!")
+					default:
+						return errors.New(fmt.Sprintf("Неизвестная ошибка при удалении картинки, image.id=%d", image.Id))
+					}
+				}
+			}
+			if len(delImages) > 0 {
+				logger.Debugf("Будет удалено %d картинок", len(delImages))
+				for _, image := range delImages {
+					logger.Debugf("Приступаем к удалению картинки в WOO ID=%d", image.Id)
+					status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, image.Id))
+					switch status {
+					case "200 OK":
+						logger.Debug("Картинка удалена!")
+					default:
+						return errors.New(fmt.Sprintf("Неизвестная ошибка при удалении картинки, image.id=%d", image.Id))
+					}
+				}
+			}
+
+			productsWooByID[menuitem.WOO_ID].Images = make([]models.ProductImage, 0)
+			logger.Debug("WOO:IMAGES обнулена")
+			logger.Debug("Приступаем к закачке картинки")
+
+			//api := wooapi.GetAPI()
+			//product, err := api.ProductGet(productsWooByID[menuitem.WOO_ID].ID)
+			//if err != nil {
+			//	return err
+			//}
+			//logger.Error(product.Images)
+			//
+			//os.Exit(2)
+			err = AddImageInWoo(menuitem)
+			if err != nil {
+				logger.Error("UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
+				return errors.Wrap(err, "UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
+			} else {
+				logger.Debug("Картинка успешно добавлена в продукт в WOO")
+				return nil
+			}
+
+			//if len(findImages) == 0 {
+			//	logger.Debug("Приступаем к закачке картинки")
+			//	err := AddImageInWoo(menuitem)
+			//	if err != nil {
+			//		logger.Error("UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
+			//		return errors.Wrap(err, "UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
+			//	} else {
+			//		logger.Debug("Картинка успешно добавлена в продукт в WOO")
+			//	}
+			//} else {
+			//	logger.Debugf("Картинок найдено %d штук. Обнуляем все и повторно закачиваем", len(findImages))
+			//	for _, image := range findImages {
+			//		logger.Debugf("Картинка id=%d", image.Id)
+			//		status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, image.Id))
+			//		switch status {
+			//		case "200 OK":
+			//			logger.Debug("Картинка удалена!")
+			//		default:
+			//			errorText := fmt.Sprintf("Неизвестная ошибка при удалении, id=%d", image.Id)
+			//			logger.Debug(errorText)
+			//			return errors.New(errorText)
+			//		}
+			//	}
+			//	logger.Debug("Приступаем к закачке картинок")
+			//	err := AddImageInWoo(menuitem)
+			//	if err != nil {
+			//		logger.Error("UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
+			//		return errors.Wrap(err, "UpdateImageInWoo:AddImageInWoo:Картинка не добавлена в продукт в WOO")
+			//	} else {
+			//		logger.Debug("Картинка успешно добавлена в продукт в WOO")
+			//	}
+			//}
+			//
+			//if len(delImages) > 0 {
+			//	logger.Debugf("Будет удалено %d картинок", len(delImages))
+			//	for _, image := range delImages {
+			//		logger.Debugf("Приступаем к удалению картинки в WOO ID=%d", image.Id)
+			//		status, _ := SendDeleteRequest(fmt.Sprintf("%s/wp-json/wp/v2/media/%d", cfg.WOOCOMMERCE.URL, image.Id))
+			//		switch status {
+			//		case "200 OK":
+			//			logger.Debug("Картинка удалена!")
+			//		default:
+			//			return errors.New(fmt.Sprintf("Неизвестная ошибка при удалении картинки, image.id=%d", image.Id))
+			//		}
+			//	}
+			//}
+			//return nil
+
 		}
 	} else {
-		return errors.New("Продукт не найден")
+		return errors.New("Продукт не найден в WOO")
 	}
 }
 
 func AddImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
-	// todo срань переделать
 	logger := logging.GetLogger()
 	logger.Debug("Start AddImageInWoo")
 	defer logger.Debug("End AddImageInWoo")
-
 	menu, err := cache.GetMenu()
 	if err != nil {
 		return err
 	}
-
 	productsWooByID, err := menu.GetProductsWooByID()
 	if err != nil {
 		return err
 	}
 	cfg := config.GetConfig()
-
+	api := wooapi.GetAPI()
 	status, content := SendPostRequest(fmt.Sprintf("%s/wp-json/wp/v2/media", cfg.WOOCOMMERCE.URL), menuitem.WOO_IMAGE_NAME)
 	switch status {
 	case "201 Created":
@@ -873,46 +862,35 @@ func AddImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
 
 		imageJ := new(imageJson)
 		err := json.Unmarshal(content, imageJ)
-
 		if err != nil {
 			return errors.Wrap(err, "Не удалось выполнить Unmarshal")
 		} else {
-			//imageUrl := imageJ.SourceUrl
-			imageID := imageJ.Id
-			api := wooapi.GetAPI()
-
 			if _, found := productsWooByID[menuitem.WOO_ID]; found {
-
-				var i models.ProductImage
-				//i.Src = imageUrl
-				i.Alt = menuitem.WOO_IMAGE_NAME
-				i.Id = imageID
-
-				productsWooByID[menuitem.WOO_ID].Images = append(productsWooByID[menuitem.WOO_ID].Images, i)
-
+				var imageAdd models.ProductImage
+				imageAdd.Alt = menuitem.WOO_IMAGE_NAME
+				imageAdd.Id = imageJ.Id
+				logger.Debugf("Добавляем картинку: ID:%d, Name:%s", imageAdd.Id, imageAdd.Alt)
+				productsWooByID[menuitem.WOO_ID].Images = append(productsWooByID[menuitem.WOO_ID].Images, imageAdd)
 				_, err := api.ProductUpdate(productsWooByID[menuitem.WOO_ID])
 				if err != nil {
 					logger.Error(err, "Картинка не обновилась у продукт")
 					return errors.Wrapf(err, "Картинка не обновилась у продукт")
 				} else {
 					logger.Debug("Картинка обновлена")
+					return nil
 				}
-
 			} else {
 				return errors.New("Продукт не найден")
 			}
-
 		}
-	case "200":
-		logger.Debug("200 okk")
-		os.Exit(11111) // todo
-
 	default:
-		os.Exit(2222) // todo
+		errorText := fmt.Sprintf("Неизвестное поведение. Status: %s", status)
+		logger.Error(errorText)
+		return errors.New(errorText)
 	}
-
-	return nil
 }
+
+//todo время синхронизации поправить для каждого блока - которая в итоговом отображении в итоге
 
 func SendPostRequest(url string, filename string) (string, []byte) {
 	client := &http.Client{}
@@ -930,7 +908,7 @@ func SendPostRequest(url string, filename string) (string, []byte) {
 	req.Header.Set("Content-Type", "image/jpeg")
 	req.Header.Set("Content-Disposition", fmt.Sprintf(`form-data; filename="%s"`, filename))
 
-	req.SetBasicAuth("restocrm", "108restocrm108")
+	req.SetBasicAuth(cfg.WOOCOMMERCE.User, cfg.WOOCOMMERCE.Password)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
@@ -943,6 +921,9 @@ func SendPostRequest(url string, filename string) (string, []byte) {
 }
 
 func SendDeleteRequest(url string) (string, []byte) {
+
+	cfg := config.GetConfig()
+
 	client := &http.Client{}
 
 	req, err := http.NewRequest("DELETE", url, nil)
@@ -953,7 +934,7 @@ func SendDeleteRequest(url string) (string, []byte) {
 	q := req.URL.Query()
 	q.Add("force", "true")
 	req.URL.RawQuery = q.Encode()
-	req.SetBasicAuth("restocrm", "108restocrm108")
+	req.SetBasicAuth(cfg.WOOCOMMERCE.User, cfg.WOOCOMMERCE.Password)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
@@ -966,7 +947,7 @@ func SendDeleteRequest(url string) (string, []byte) {
 }
 
 func CheckImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
-
+	//todo срань
 	logger := logging.GetLogger()
 	logger.Debug("Start CheckImageInWoo")
 	defer logger.Debug("End CheckImageInWoo")
@@ -981,40 +962,15 @@ func CheckImageInWoo(menuitem *modelsRK7API.MenuitemItem) error {
 		return err
 	}
 
-	if len(productsWooByID) == 0 {
-		err = menu.RefreshProducts()
-		if err != nil {
-			return err
-		}
-
-		productsWooByID, err = menu.GetProductsWooByID()
-		if err != nil {
-			return err
-		}
-	}
-
 	if product, found := productsWooByID[menuitem.WOO_ID]; found {
 		if len(product.Images) > 0 {
 			logger.Debug("Картинок более 0 в WOO:Images")
 			logger.Debug("Выполняем поиск картинки в WOO:Images")
-
 			for _, image := range product.Images {
-
 				if image.Alt == menuitem.WOO_IMAGE_NAME && menuitem.WOO_IMAGE_NAME != "" {
 					logger.Debug("Картинка найдена")
 					return nil
 				}
-
-				//if imageMap, ok := image.(productImage); ok {
-				//	if imageMap.Name == menuitem.WOO_IMAGE_NAME || imageMap.Name != "" {
-				//		logger.Debug("Картинка найдена")
-				//		return nil
-				//	}
-				//} else {
-				//	logger.Debug("Ошибка приведения. Отправим сообщение об ошибке")
-				//	return errors.New(ERROR_IMAGE_CHECK_ERROR_CAST)
-				//}
-
 			}
 			logger.Debug("Не удалось найти картинку в WOO:Image. Необходимо обновить картинку")
 			return errors.New(ERROR_IMAGE_NOT_FOUND_IN_WOO_IMAGE)
@@ -1046,14 +1002,14 @@ func UpdateImageInDB(menuitem *modelsRK7API.MenuitemItem, modTime time.Time) err
 	}(db)
 
 	var menuitemDBs []database.Menuitem
-	query := fmt.Sprintf(`SELECT ID, IdentRK, ImageModTime FROM Menuitem WHERE IdentRK=%d`, menuitem.ItemIdent)
+	query := fmt.Sprintf(database.DATABASE_SELECT_MENUITEM, menuitem.ItemIdent)
 	err = db.Select(&menuitemDBs, query)
 	if err != nil {
 		return errors.Wrapf(err, "failed SELECT to dbsqlite")
 	} else {
 		if len(menuitemDBs) == 0 {
 			tx := db.MustBegin()
-			tx.MustExec("INSERT INTO Menuitem (IdentRK, ImageModTime) VALUES ($1, $2)", menuitem.ItemIdent, modTime.Format(time.RFC3339))
+			tx.MustExec("INSERT INTO Menuitem (IdentRK, ImageModTime1, ImageName1) VALUES ($1, $2, $3)", menuitem.ItemIdent, modTime.Format(time.RFC3339), menuitem.WOO_IMAGE_NAME)
 			err := tx.Commit()
 			if err != nil {
 				return errors.Wrapf(err, "failed INSERT to dbsqlite")
@@ -1062,7 +1018,8 @@ func UpdateImageInDB(menuitem *modelsRK7API.MenuitemItem, modTime time.Time) err
 			}
 		} else if len(menuitemDBs) == 1 {
 			tx := db.MustBegin()
-			tx.MustExec("UPDATE Menuitem SET ImageModTime = $1 WHERE IdentRK = $2", modTime.Format(time.RFC3339), menuitem.ItemIdent)
+			tx.MustExec("UPDATE Menuitem SET ImageModTime1 = $1 WHERE IdentRK = $2", modTime.Format(time.RFC3339), menuitem.ItemIdent)
+			tx.MustExec("UPDATE Menuitem SET ImageName1 = $1 WHERE IdentRK = $2", menuitem.WOO_IMAGE_NAME, menuitem.ItemIdent)
 			err := tx.Commit()
 			if err != nil {
 				return errors.Wrapf(err, "failed UPDATE to dbsqlite")
@@ -1233,14 +1190,3 @@ type imageJson struct {
 		} `json:"curies"`
 	} `json:"_links"`
 }
-
-//type imageS struct {
-//	Id              int    `json:"id,omitempty"`
-//	DateCreated     string `json:"date_created,omitempty"`
-//	DateCreatedGmt  string `json:"date_created_gmt,omitempty"`
-//	DateModified    string `json:"date_modified,omitempty"`
-//	DateModifiedGmt string `json:"date_modified_gmt,omitempty"`
-//	Src             string `json:"src,omitempty"`
-//	Name            string `json:"name,omitempty"`
-//	Alt             string `json:"alt,omitempty"`
-//}

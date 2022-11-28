@@ -76,6 +76,9 @@ type (
 			Secret         string
 			MenuCategoryId int
 			RPS            int
+			User           string
+			Password       string
+			Source         string
 		}
 		XMLINTERFACE struct {
 			Type      int

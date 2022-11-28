@@ -31,7 +31,7 @@ func SyncMenuitems() error {
 	var resultSyncError []string
 
 	cfg := config.GetConfig()
-	rk7API := rk7api.GetAPI()
+	rk7API := rk7api.GetAPI("REF")
 	DB, err := sqlx.Connect("sqlite3", database.DB_NAME)
 	if err != nil {
 		logger.Fatalf("failed sqlx.Connect; %v", err)
@@ -45,21 +45,6 @@ func SyncMenuitems() error {
 
 	logger.Debug("Получаем меню из RK7 и WOO")
 	menu, err := cache.GetMenu()
-	if err != nil {
-		return err
-	}
-
-	err = menu.RefreshMenuitems()
-	if err != nil {
-		return err
-	}
-
-	err = menu.RefreshProducts()
-	if err != nil {
-		return err
-	}
-
-	err = menu.RefreshCateglist()
 	if err != nil {
 		return err
 	}
@@ -80,6 +65,11 @@ func SyncMenuitems() error {
 	}
 
 	productsWooByID, err := menu.GetProductsWooByID()
+	if err != nil {
+		return err
+	}
+
+	dishRestsByIdent, err := menu.GetDishRestsByIdent()
 	if err != nil {
 		return err
 	}
@@ -130,7 +120,15 @@ LoopOneStage:
 			logger.Debug("Блюдо с не пустым WOO_ID. Пробуем найти в WOO")
 			if product, found := productsWooByID[menuitem.WOO_ID]; found {
 				logger.Debugf("Блюдо найдено в WOO. Name: %s, WOO_ID: %d, WOO_ParentId: %d, WOO_Status: %s, WOO_Price: %s", product.Name, product.ID, product.Categories[0].Id, product.Status, product.RegularPrice)
-				if menuitem.Status != 3 || menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW {
+				logger.Debug("Проверяем наличие в стоп-листе")
+				dishInStopList := false
+				if dishRests, foundInStopList := dishRestsByIdent[menuitem.Ident]; foundInStopList {
+					if dishRests.Prohibited == 1 || dishRests.Quantity == 0 {
+						dishInStopList = true
+						logger.Debug("Блюдо в стоп-листе")
+					}
+				}
+				if menuitem.Status != 3 || menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW || dishInStopList {
 					logger.Debug("Блюдо не активно или c не указанной ценой в RK7 или с выключенной синхронизацией. Необходимо удалить в WOO")
 					menuitemsNeedDelInWoo = append(menuitemsNeedDelInWoo, menuitems[i])
 				} else {
@@ -193,7 +191,15 @@ LoopOneStage:
 			} else {
 				if menuitem.Status == 3 {
 					logger.Debug("Блюдо WOO указано/не найдено в WOO/активное. Проверяем цену")
-					if menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW {
+					logger.Debug("Проверяем наличие в стоп-листе")
+					dishInStopList := false
+					if dishRests, foundInStopList := dishRestsByIdent[menuitem.Ident]; foundInStopList {
+						if dishRests.Prohibited == 1 || dishRests.Quantity == 0 {
+							dishInStopList = true
+							logger.Debug("Блюдо в стоп-листе")
+						}
+					}
+					if menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW || dishInStopList {
 						logger.Debug("Блюдо без цены или выключена синхронизация.. Обнуляем в кеше и RK7.")
 						menuitemsIndefiniteWithWooIDActiveWithoutPrice = append(menuitemsIndefiniteWithWooIDActiveWithoutPrice, menuitems[i])
 					} else {
@@ -208,7 +214,15 @@ LoopOneStage:
 		} else {
 			if menuitem.Status == 3 {
 				logger.Debug("Блюдо активное/не указано WOO_ID/WOO_ID=0. Проверяем цену")
-				if menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW {
+				logger.Debug("Проверяем наличие в стоп-листе")
+				dishInStopList := false
+				if dishRests, foundInStopList := dishRestsByIdent[menuitem.Ident]; foundInStopList {
+					if dishRests.Prohibited == 1 || dishRests.Quantity == 0 {
+						dishInStopList = true
+						logger.Debug("Блюдо в стоп-листе")
+					}
+				}
+				if menuitem.PRICETYPES == 9223372036854775807 || menuitem.CLASSIFICATORGROUPS != cfg.RK7.CLASSIFICATORGROUPSALLOW || dishInStopList {
 					logger.Debug("Блюдо без цены или выключена синхронизация. Обнуляем в кеше и RK7")
 					menuitemsIndefiniteActiveWithoutPrice = append(menuitemsIndefiniteActiveWithoutPrice, menuitems[i])
 				} else {
@@ -638,7 +652,7 @@ func NulledMenuitemInRK7(menuitem *modelsRK7API.MenuitemItem) error {
 	logger.Info("Start NulledMenuitemInRK7")
 	defer logger.Info("End NulledMenuitemInRK7")
 	var err error
-	rk7 := rk7api.GetAPI()
+	rk7 := rk7api.GetAPI("REF")
 	cfg := config.GetConfig()
 	logger.Debug("Обнуляем WOO_ID/WOO_PARENT_ID в RK7.")
 
@@ -671,7 +685,7 @@ func UpdateMenuitemParentIDInRK7(menuitem *modelsRK7API.MenuitemItem, parentID i
 	logger.Info("Start UpdateMenuitemParentIDInRK7")
 	defer logger.Info("End UpdateMenuitemParentIDInRK7")
 	var err error
-	rk7 := rk7api.GetAPI()
+	rk7 := rk7api.GetAPI("REF")
 	logger.Debug("Обновляем WOO_PARENT_ID в RK7/кеше RK7")
 
 	var menuitems []*modelsRK7API.MenuitemItem
@@ -703,7 +717,7 @@ func CreateMenuitemInWoo(menuitem *modelsRK7API.MenuitemItem) error {
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при получении кеша меню")
 	}
-	rk7 := rk7api.GetAPI()
+	rk7 := rk7api.GetAPI("REF")
 	menu, err := cache.GetMenu()
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при получении кеша меню")

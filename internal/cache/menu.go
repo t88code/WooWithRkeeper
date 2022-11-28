@@ -19,10 +19,16 @@ type Menu interface {
 	//RK7
 	RefreshCateglist() error
 	RefreshMenuitems() error
+	RefreshDishRests() error
+
 	GetMenuitems() ([]*modelsRK7API.MenuitemItem, error)
 	GetMenuitemsRK7ByIdent() (map[int]*modelsRK7API.MenuitemItem, error)
+
 	GetCateglistRK7() ([]*modelsRK7API.Categlist, error)
 	GetCateglistsRK7ByIdent() (map[int]*modelsRK7API.Categlist, error)
+
+	GetDishRests() ([]*modelsRK7API.DishRest, error)
+	GetDishRestsByIdent() (map[int]*modelsRK7API.DishRest, error)
 
 	//WOO
 	RefreshProducts() error
@@ -42,6 +48,10 @@ type Menu interface {
 var cacheMenuGlobal menu
 
 type menu struct {
+
+	//parametr
+	cacheLifetime time.Duration
+
 	//RK7 - Menuitems
 	MenuitemsRK7        []*modelsRK7API.MenuitemItem
 	MenuitemsRK7ByIdent map[int]*modelsRK7API.MenuitemItem
@@ -50,6 +60,10 @@ type menu struct {
 	//RK7 - Categlists
 	CateglistsRK7        []*modelsRK7API.Categlist
 	CateglistsRK7ByIdent map[int]*modelsRK7API.Categlist
+
+	//RK7 - StopList
+	DishRests        []*modelsRK7API.DishRest
+	DishRestsByIdent map[int]*modelsRK7API.DishRest
 
 	//WOO - Product
 	ProductsWooByID map[int]*modelsWOOAPI.Product
@@ -243,7 +257,13 @@ func (m *menu) DeleteProductCategoryFromCache(WOOID int) error {
 }
 
 func (m *menu) GetMenuitems() ([]*modelsRK7API.MenuitemItem, error) {
-	// TODO if version>0 || timeoute>0 {RefreshMenuitems()}
+	// todo сделать проверку по времени
+	if len(m.MenuitemsRK7) == 0 {
+		err := m.RefreshMenuitems()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.MenuitemsRK7, nil
 }
 
@@ -257,11 +277,43 @@ func (m *menu) GetMenuitemsRK7ByIdent() (map[int]*modelsRK7API.MenuitemItem, err
 	return m.MenuitemsRK7ByIdent, nil
 }
 
+func (m *menu) GetDishRests() ([]*modelsRK7API.DishRest, error) {
+	if len(m.DishRests) == 0 {
+		err := m.RefreshDishRests()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return m.DishRests, nil
+}
+
+func (m *menu) GetDishRestsByIdent() (map[int]*modelsRK7API.DishRest, error) {
+	if len(m.DishRestsByIdent) == 0 {
+		err := m.RefreshDishRests()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return m.DishRestsByIdent, nil
+}
+
 func (m *menu) GetCateglistRK7() ([]*modelsRK7API.Categlist, error) {
+	if len(m.CateglistsRK7) == 0 {
+		err := m.RefreshCateglist()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.CateglistsRK7, nil
 }
 
 func (m *menu) GetCateglistsRK7ByIdent() (map[int]*modelsRK7API.Categlist, error) {
+	if len(m.CateglistsRK7ByIdent) == 0 {
+		err := m.RefreshCateglist()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.CateglistsRK7ByIdent, nil
 }
 
@@ -276,10 +328,22 @@ func (m *menu) GetProductsWooByID() (map[int]*modelsWOOAPI.Product, error) {
 }
 
 func (m *menu) GetProductCategoriesWooByID() (map[int]*modelsWOOAPI.ProductCategory, error) {
+	if len(m.ProductCategoriesWooByID) == 0 {
+		err := m.RefreshProductCategories()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.ProductCategoriesWooByID, nil
 }
 
 func (m *menu) GetProductCategoriesWooBySlug() (map[string]*modelsWOOAPI.ProductCategory, error) {
+	if len(m.ProductCategoriesWooBySlug) == 0 {
+		err := m.RefreshProductCategories()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return m.ProductCategoriesWooBySlug, nil
 }
 
@@ -289,12 +353,7 @@ func (m *menu) RefreshCateglist() error {
 	logger.Debug("Start RefreshCateglist")
 	defer logger.Debug("End RefreshCateglist")
 	timeStart := time.Now()
-	cfg := config.GetConfig()
-	RK7API, err := rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
-	if err != nil {
-		return errors.Wrap(err, "failed rk7api.NewAPI")
-	}
-
+	RK7API := rk7api.GetAPI("REF")
 	//получить список всех Categlist из RK
 	logger.Debug("Получить список Categlist из RK7")
 	Rk7QueryResultGetRefDataCateglist, err := RK7API.GetRefData("Categlist", nil,
@@ -327,11 +386,7 @@ func (m *menu) RefreshMenuitems() error {
 	defer logger.Debug("End RefreshMenuitems")
 	timeStart := time.Now()
 	cfg := config.GetConfig()
-	RK7API, err := rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
-	if err != nil {
-		return errors.Wrap(err, "failed rk7api.NewAPI")
-	}
-
+	RK7API := rk7api.GetAPI("REF")
 	//получить актуальное меню RK7
 	logger.Debug("Получить список всех блюд из RK7")
 	var replaceAttribut []rk7api.ReplaceAttribut
@@ -423,11 +478,45 @@ func (m *menu) RefreshProductCategories() error {
 	return nil
 }
 
+func (m *menu) RefreshDishRests() error {
+
+	logger := logging.GetLogger()
+	logger.Debug("Start RefreshDishRests")
+	defer logger.Debug("End RefreshDishRests")
+	timeStart := time.Now()
+	RK7API := rk7api.GetAPI("MID")
+
+	logger.Debug("Получить список всех блюд из стоп-листа")
+
+	Rk7QueryResultGetDishRests, err := RK7API.GetDishRests()
+	if err != nil {
+		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetDishRests")
+	}
+
+	m.DishRests = Rk7QueryResultGetDishRests.DishRest
+	logger.Debugf("Длина списка DishRests = %d\n", len(m.DishRests))
+
+	m.DishRestsByIdent = make(map[int]*modelsRK7API.DishRest)
+	for i, dish := range m.DishRests {
+		m.DishRestsByIdent[dish.ID] = m.DishRests[i]
+	}
+	logger.Debugf("Длина списка DishRests = %d\n", len(m.DishRests))
+	logger.Debugf("RefreshDishRests. Время обновления: %s", time.Now().Sub(timeStart))
+
+	return nil
+}
+
 func (m *menu) RefreshMenu() error {
 
 	logger := logging.GetLogger()
 	logger.Debug("Start RefreshMenu")
 	defer logger.Debug("End RefreshMenu")
+
+	//TODO оптимизация
+	//можно запустить получение меню в отдельных потоках
+	//1 поток - RK7REF
+	//2 поток - RK7MID
+	//3 поток - WOO
 
 	err := m.RefreshMenuitems()
 	if err != nil {
@@ -447,6 +536,11 @@ func (m *menu) RefreshMenu() error {
 	err = m.RefreshProductCategories()
 	if err != nil {
 		return errors.Wrap(err, "failed in menu.RefreshProductCategories()")
+	}
+
+	err = m.RefreshDishRests()
+	if err != nil {
+		return errors.Wrap(err, "failed in menu.RefreshDishRests()")
 	}
 
 	return nil

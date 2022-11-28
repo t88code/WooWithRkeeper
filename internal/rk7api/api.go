@@ -24,6 +24,7 @@ const ERROS_NUMBER_5305 = "5305"
 type RK7API interface {
 	GetRefList() (*models.RK7QueryResultGetRefList, error)
 	GetRefData(RefName string, replaceAttribut []ReplaceAttribut, opts ...models.GetRefDataOptions) (RK7QueryResult, error)
+	GetDishRests() (*models.RK7QueryResultGetDishRests, error)
 
 	SetRefDataMenuitem(ID int, fields ...models.FieldMenuitemItem) (RK7QueryResult, error)
 	SetRefDataMenuitems(menuitemItems []*models.MenuitemItem) (*models.RK7QueryResultSetRefData, error)
@@ -40,7 +41,8 @@ type RK7API interface {
 	GetXMLLicenseInstanceSeqNumber(Anchor, LicenseToken, Guid string) (*models.RK7QueryResultGetXMLLicenseInstanceSeqNumber, error)
 }
 
-var rk7apiGlobal *rk7api
+var clientMidServer *rk7api
+var clientRefServer *rk7api
 
 type rk7api struct {
 	url     string
@@ -49,6 +51,35 @@ type rk7api struct {
 	xmlType int
 	xmlApi  *xmlInterface
 	*ReplaceAttribut
+}
+
+func (r *rk7api) GetDishRests() (*models.RK7QueryResultGetDishRests, error) {
+	RK7QueryGetDishRests := new(models.RK7QueryGetDishRests)
+	RK7QueryGetDishRests.RK7CMD.CMD = "GetDishRests"
+
+	xmlQuery, err := xml.MarshalIndent(RK7QueryGetDishRests, "  ", "    ")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed Marshal in func GetDishRests")
+	}
+
+	xmlResponse, err := Send(r.url, r.user, r.pass, xmlQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed in func SendToXML")
+	}
+
+	RK7QueryResultGetDishRests := new(models.RK7QueryResultGetDishRests)
+	err = xml.Unmarshal(xmlResponse, RK7QueryResultGetDishRests)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetDishRests>Не удалось выполнить Unmarshal")
+	}
+	if RK7QueryResultGetDishRests.XMLName.Local != `RK7QueryResult` {
+		return nil, errors.New("Ошибка в Response RK7API.GetOrderList. RK7QueryResult not found")
+	}
+	if RK7QueryResultGetDishRests.Status != "Ok" {
+		return nil, errors.New(fmt.Sprintf("Ошибка в Response RK7API.GetOrderList:>%s.%s", RK7QueryResultGetDishRests.Status, RK7QueryResultGetDishRests.ErrorText))
+	}
+
+	return RK7QueryResultGetDishRests, nil
 }
 
 type ReplaceAttribut struct {
@@ -574,41 +605,61 @@ func Send(url, user, pass string, data []byte) (respBody []byte, e error) {
 	}
 }
 
-func NewAPI(url string, user string, pass string) (RK7API, error) {
+func NewAPI(url string, user string, pass string, mode string) (RK7API, error) {
 
 	var err error
 	cfg := config.GetConfig()
-	xmlApi := new(xmlInterface)
 
-	switch cfg.XMLINTERFACE.Type {
-	case 1:
-		xmlApi = nil
-	case 2:
-		xmlApi, err = NewXmlInterface(cfg.XMLINTERFACE.UserName,
-			cfg.XMLINTERFACE.Password,
-			cfg.XMLINTERFACE.Token,
-			cfg.XMLINTERFACE.ProductID,
-			cfg.XMLINTERFACE.Guid,
-			cfg.XMLINTERFACE.RestCode,
-			cfg.XMLINTERFACE.URL,
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed NewXmlInterface")
+	switch mode {
+	case "REF":
+		clientRefServer = &rk7api{
+			url:     url,
+			user:    user,
+			pass:    pass,
+			xmlType: cfg.XMLINTERFACE.Type,
+			xmlApi:  nil,
 		}
+		return clientRefServer, nil
+	case "MID":
+		xmlApi := new(xmlInterface)
+		switch cfg.XMLINTERFACE.Type {
+		case 1:
+			xmlApi = nil
+		case 2:
+			xmlApi, err = NewXmlInterface(cfg.XMLINTERFACE.UserName,
+				cfg.XMLINTERFACE.Password,
+				cfg.XMLINTERFACE.Token,
+				cfg.XMLINTERFACE.ProductID,
+				cfg.XMLINTERFACE.Guid,
+				cfg.XMLINTERFACE.RestCode,
+				cfg.XMLINTERFACE.URL,
+			)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed NewXmlInterface")
+			}
+		default:
+			return nil, errors.New(fmt.Sprintf("не удалось определить cfg.XMLINTERFACE.Type=%d", cfg.XMLINTERFACE.Type))
+		}
+		clientMidServer = &rk7api{
+			url:     url,
+			user:    user,
+			pass:    pass,
+			xmlType: cfg.XMLINTERFACE.Type,
+			xmlApi:  xmlApi,
+		}
+		return clientMidServer, nil
 	default:
-		return nil, errors.New(fmt.Sprintf("не удалось определить cfg.XMLINTERFACE.Type=%d", cfg.XMLINTERFACE.Type))
+		return nil, errors.New("failed mode")
 	}
-
-	rk7apiGlobal = &rk7api{
-		url:     url,
-		user:    user,
-		pass:    pass,
-		xmlType: cfg.XMLINTERFACE.Type,
-		xmlApi:  xmlApi,
-	}
-	return rk7apiGlobal, nil
 }
 
-func GetAPI() RK7API {
-	return rk7apiGlobal
+func GetAPI(mode string) RK7API {
+	switch mode {
+	case "REF":
+		return clientRefServer
+	case "MID":
+		return clientMidServer
+	default:
+		return nil
+	}
 }

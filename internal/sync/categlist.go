@@ -29,7 +29,7 @@ func SyncCateglist() error {
 	var flagNeedUpdate bool = false
 
 	cfg := config.GetConfig()
-	rk7API := rk7api.GetAPI()
+	rk7API := rk7api.GetAPI("REF")
 	DB, err := sqlx.Connect("sqlite3", database.DB_NAME)
 	if err != nil {
 		logger.Fatalf("failed sqlx.Connect; %v", err)
@@ -43,16 +43,6 @@ func SyncCateglist() error {
 
 	logger.Debug("Получаем меню из RK7 и WOO")
 	menu, err := cache.GetMenu()
-	if err != nil {
-		return err
-	}
-
-	err = menu.RefreshCateglist()
-	if err != nil {
-		return err
-	}
-
-	err = menu.RefreshProductCategories()
 	if err != nil {
 		return err
 	}
@@ -733,7 +723,7 @@ func CreateCateglistInWoo(categlist *modelsRK7API.Categlist) error {
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при получении кеша меню")
 	}
-	rk7 := rk7api.GetAPI()
+	rk7 := rk7api.GetAPI("REF")
 	menu, err := cache.GetMenu()
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при получении кеша меню")
@@ -793,7 +783,7 @@ func NulledCateglistInRK7(categlist *modelsRK7API.Categlist) error {
 	logger.Debug("Start NulledCateglistInRK7")
 	defer logger.Debug("End NulledCateglistInRK7")
 	var err error
-	rk7 := rk7api.GetAPI()
+	rk7 := rk7api.GetAPI("REF")
 	cfg := config.GetConfig()
 	logger.Debug("Обнуляем WOO_ID/WOO_PARENT_ID в RK7.")
 
@@ -821,7 +811,7 @@ func UpdateParentIDCateglistInRK7(categlist *modelsRK7API.Categlist, parentID in
 	logger.Debug("Start UpdateParentIDCateglistInRK7")
 	defer logger.Debug("End UpdateParentIDCateglistInRK7")
 	var err error
-	rk7 := rk7api.GetAPI()
+	rk7 := rk7api.GetAPI("REF")
 	logger.Debug("Обновляем WOO_PARENT_ID в RK7/кеше RK7")
 
 	var categlists []*modelsRK7API.Categlist

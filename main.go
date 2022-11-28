@@ -60,7 +60,12 @@ func init() {
 
 	_ = wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
 
-	_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
+	_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass, "REF")
+	if err != nil {
+		logger.Fatal("failed main init; rk7api.NewAPI; ", err)
+	}
+
+	_, err = rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass, "MID")
 	if err != nil {
 		logger.Fatal("failed main init; rk7api.NewAPI; ", err)
 	}

@@ -192,15 +192,12 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	logger.Info("Start WebhookCreateOrderInRKeeper")
 	defer logger.Info("End WebhookCreateOrderInRKeeper")
 	cfg := config.GetConfig()
-	RK7API, err := rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7.User, cfg.RK7.Pass)
-	if err != nil {
-		return errors.New("failed rk7api.NewAPI()")
-	}
+	RK7API := rk7api.GetAPI("MID")
 
 	logger.Info("Запущена обработка Webhook на событие создание заказа")
 
 	WebhookCreatOrder := new(WebhookCreatOrder)
-	err = json.Unmarshal(jsonByteArray, WebhookCreatOrder)
+	err := json.Unmarshal(jsonByteArray, WebhookCreatOrder)
 	if err != nil {
 		return errors.Wrap(err, "failed json.Unmarshal(jsonByteArray, WebhookCreatOrder)")
 	}
@@ -212,7 +209,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	Order.OrderType.Code = cfg.RK7MID.OrderTypeCode
 	Order.Table = new(modelsRK7API.Table)
 	Order.Table.Code = cfg.RK7MID.TableCode
-	Order.ExtSource = "Woocommerce"
+	Order.ExtSource = cfg.WOOCOMMERCE.Source
 	Order.ExtID = strconv.Itoa(WebhookCreatOrder.Id)
 
 	//создать Props в RK7
@@ -242,6 +239,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var DateTimeStart string                                               // OpenTime
 	var DurationRK string                                                  //duration="1899-12-30T04:00:00"
 	var Deposit int                                                        // "10000"
+	var SourceWoo string = cfg.WOOCOMMERCE.Source
 
 	if CompanyName != "" {
 		Order.Holder = fmt.Sprintf("#%d %s", ID, CompanyName)
@@ -257,7 +255,7 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	var Props []*modelsRK7API.Prop
 
 	Props = append(Props, &modelsRK7API.Prop{
-		Name:  "ID",
+		Name:  "OrderID",
 		Value: strconv.Itoa(ID),
 	})
 	Props = append(Props, &modelsRK7API.Prop{
@@ -293,6 +291,10 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	Props = append(Props, &modelsRK7API.Prop{
 		Name:  "DateCreated",
 		Value: DateCreated,
+	})
+	Props = append(Props, &modelsRK7API.Prop{
+		Name:  "SourceWoo",
+		Value: SourceWoo,
 	})
 
 	var typeOrder int

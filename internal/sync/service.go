@@ -34,7 +34,12 @@ func SyncMenuServiceWithRecovered() {
 
 		_ = wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
 
-		_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass)
+		_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass, "REF")
+		if err != nil {
+			logger.Fatal("failed main init; rk7api.NewAPI; ", err)
+		}
+
+		_, err = rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass, "MID")
 		if err != nil {
 			logger.Fatal("failed main init; rk7api.NewAPI; ", err)
 		}
@@ -61,7 +66,7 @@ func SyncMenuService() {
 	}()
 
 	cfg := config.GetConfig()
-	RK7API := rk7api.GetAPI()
+	RK7API := rk7api.GetAPI("REF")
 
 	//TODO обработка ошибок базы!!
 	DB, err := sqlx.Connect("sqlite3", database.DB_NAME)
@@ -80,10 +85,18 @@ func SyncMenuService() {
 		telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при попытке получить справочники меню RK и товаров BX24, err: %v", err))
 	}
 
+	timeStart := time.Now()
+	err = m.RefreshMenu()
+	if err != nil {
+		logger.Errorf("failed RefreshMenu(); %v", err)
+		telegram.SendMessageToTelegramWithLogError(err.Error())
+	}
+	timeRefreshMenu := time.Now().Sub(timeStart)
 	for {
-		timeStart := time.Now()
+		var timeUpdateSyncCateglist, timeUpdateSyncMenuitems, timeUpdateSyncImages time.Duration
+
 		if cfg.MENUSYNC.SyncCateglist == 1 {
-			// сверить версию справочника Categlist
+			timeStartSyncCateglist := time.Now()
 			verifyVersionResult, err := VerifyVersion(RK7API, DB, "Categlist")
 			if err != nil {
 				telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Не удалось выполнить проверку меню. Ошибка при проверке VerifyVersion: %v", err))
@@ -92,7 +105,6 @@ func SyncMenuService() {
 				logger.Info("Проверка не требуется")
 			} else {
 				logger.Println("Требуется обновление Categlist")
-				timeStart := time.Now()
 				err := SyncCateglist()
 				if err != nil {
 					if err.Error() == SYNC_CATEGLIST_NEED_UPDATE {
@@ -107,12 +119,14 @@ func SyncMenuService() {
 					}
 				} else {
 					logger.Infof("Синхронизация Categlist выполнена успешно. Версия справочника Categlist в DB обновлена")
-					logger.Infof("Время обновления Categlist: %s", time.Now().Sub(timeStart))
 				}
 			}
+			timeUpdateSyncCateglist = time.Now().Sub(timeStartSyncCateglist)
+			logger.Infof("Время обновления Categlist: %s", timeUpdateSyncCateglist)
 		}
 
 		if cfg.MENUSYNC.SyncMenuitems == 1 {
+			timeStartSyncMenuitems := time.Now()
 			// сверить версию справочника Menuitems
 			verifyVersionResultMenuitems, err := VerifyVersion(RK7API, DB, "Menuitems")
 			if err != nil {
@@ -128,25 +142,39 @@ func SyncMenuService() {
 				logger.Info("Проверка не требуется")
 			} else {
 				logger.Println("Требуется обновление меню")
-				timeStart := time.Now()
 				err := SyncMenuitems()
 				if err != nil {
 					telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации меню SyncMenu: \n%v\n", err))
 				} else {
 					logger.Infof("Синхронизация меню выполнена успешно. Версия справочника Menuitems и Prices в DB обновлена")
-					logger.Infof("Время обновления Menuitems: %s", time.Now().Sub(timeStart))
 				}
 			}
+			timeUpdateSyncMenuitems = time.Now().Sub(timeStartSyncMenuitems)
+			logger.Infof("Время обновления Menuitems: %s", timeUpdateSyncMenuitems)
 		}
 
 		if cfg.MENUSYNC.SyncImages == 1 {
+			timeStartSyncImages := time.Now()
 			err := SyncImages()
 			if err != nil {
 				telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации картинок SyncMenu: \n%v\n", err))
 			} else {
 				logger.Infof("Синхронизация картинок выполнена успешно")
-				logger.Infof("Время обновления Images: %s", time.Now().Sub(timeStart))
 			}
+			timeUpdateSyncImages = time.Now().Sub(timeStartSyncImages)
+			logger.Infof("Время обновления Images: %s", timeUpdateSyncImages)
+		}
+
+		logger.Info("Тайминги по обновлениями:")
+		logger.Infof("RefreshMenu: %s", timeRefreshMenu)
+		if cfg.MENUSYNC.SyncCateglist == 1 {
+			logger.Infof("Categlist: %s", timeUpdateSyncCateglist)
+		}
+		if cfg.MENUSYNC.SyncMenuitems == 1 {
+			logger.Infof("Menuitems: %s", timeUpdateSyncMenuitems)
+		}
+		if cfg.MENUSYNC.SyncImages == 1 {
+			logger.Infof("Images: %s", timeUpdateSyncImages)
 		}
 
 		logger.Infof("Полное время обновления: %s", time.Now().Sub(timeStart))
@@ -154,11 +182,13 @@ func SyncMenuService() {
 
 		time.Sleep(time.Second * time.Duration(cfg.MENUSYNC.Timeout))
 
+		timeStart = time.Now()
 		err = m.RefreshMenu()
 		if err != nil {
 			logger.Errorf("failed RefreshMenu(); %v", err)
 			telegram.SendMessageToTelegramWithLogError(err.Error())
 		}
+		timeRefreshMenu = time.Now().Sub(timeStart)
 	}
 }
 
