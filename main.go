@@ -7,19 +7,17 @@ import (
 	"WooWithRkeeper/internal/handlers/httphandler"
 	"WooWithRkeeper/internal/license"
 	"WooWithRkeeper/internal/rk7api"
+	modelsRK7API "WooWithRkeeper/internal/rk7api/models"
 	"WooWithRkeeper/internal/sync"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/version"
 	"WooWithRkeeper/internal/wooapi"
 	"WooWithRkeeper/pkg/logging"
-	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"os"
-	"time"
 )
 
 //TODO сделать логировование Debug
@@ -42,27 +40,32 @@ func main() {
 
 	check.Check()
 	cfg := config.GetConfig()
-	db, err := sqlx.Connect("sqlite3", database.DB_NAME)
+
+	RK7API := rk7api.GetAPI("REF")
+
+	propMask := fmt.Sprintf("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^%d,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO1_IMAG*,genWOO,genTEST,CLASSIFICATORGROUPS^%d)",
+		cfg.RK7.PRICETYPE,
+		cfg.RK7.CLASSIFICATORGROUPS)
+
+	Rk7QueryResultGetRefDataMenuitems, err := RK7API.GetRefData("Menuitems", nil,
+		modelsRK7API.OnlyActive("0"), //неактивные будем менять статус на N ?или может удалять? в bitrix24
+		modelsRK7API.IgnoreEnums("1"),
+		modelsRK7API.WithChildItems("3"),
+		modelsRK7API.WithMacroProp("1"),
+		modelsRK7API.PropMask(propMask))
 	if err != nil {
-		logger.Fatalf("failed sqlx.Connect; %v", err)
+		panic(err)
 	}
-	defer func(db *sqlx.DB) {
-		err := db.Close()
-		if err != nil {
-			logger.Fatalf("failed close sqlx.Connect, err: %v", err)
+
+	menuitems := (Rk7QueryResultGetRefDataMenuitems).(*modelsRK7API.RK7QueryResultGetRefDataMenuitems)
+	m := menuitems.RK7Reference.Items.Item
+
+	for _, item := range m {
+		fmt.Println(item.Name, item.WOO_IMAGE_NAME_1)
+		if item.WOO_IMAGE_NAME_1 != "" {
+			fmt.Println(item)
+			os.Exit(4)
 		}
-	}(db)
-
-	time.Sleep(time.Second * 2)
-	i := database.Image{
-		IdentRK:    1,
-		IMAGE_NAME: sql.NullString{String: "32211231231233", Valid: false},
-		Status:     sql.NullString{String: "Ignore12342123134", Valid: false},
-	}
-
-	err = i.UpdateInDb(db)
-	if err != nil {
-		logger.Panic(err)
 	}
 
 	os.Exit(2)
