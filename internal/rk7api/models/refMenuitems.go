@@ -16,7 +16,6 @@ type MenuitemItem struct {
 	WOO_ID              int    `xml:"genWOO_ID,attr"`
 	WOO_PARENT_ID       int    `xml:"genWOO_PARENT_ID,attr"`
 	WOO_LONGNAME        string `xml:"genWOO_LONGNAME,attr"`
-	WOO_IMAGE_NAME      string `xml:"genWOO_IMAGE,attr"`
-	WOO_IMAGE_NAME_2    string `xml:"genWOO_IMAGE_2,attr"`
+	WOO_IMAGE_NAME      string `xml:"genWOO_IMAGE,attr"`        // 1.jpg;2.jpg;3.jpg
 	CLASSIFICATORGROUPS int    `xml:"CLASSIFICATORGROUPS,attr"` // Классификация для включения синхронизации с сайтом
 }

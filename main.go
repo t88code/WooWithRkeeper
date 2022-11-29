@@ -12,10 +12,14 @@ import (
 	"WooWithRkeeper/internal/version"
 	"WooWithRkeeper/internal/wooapi"
 	"WooWithRkeeper/pkg/logging"
+	"database/sql"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
 //TODO сделать логировование Debug
@@ -38,6 +42,30 @@ func main() {
 
 	check.Check()
 	cfg := config.GetConfig()
+	db, err := sqlx.Connect("sqlite3", database.DB_NAME)
+	if err != nil {
+		logger.Fatalf("failed sqlx.Connect; %v", err)
+	}
+	defer func(db *sqlx.DB) {
+		err := db.Close()
+		if err != nil {
+			logger.Fatalf("failed close sqlx.Connect, err: %v", err)
+		}
+	}(db)
+
+	time.Sleep(time.Second * 2)
+	i := database.Image{
+		IdentRK:    1,
+		IMAGE_NAME: sql.NullString{String: "32211231231233", Valid: false},
+		Status:     sql.NullString{String: "Ignore12342123134", Valid: false},
+	}
+
+	err = i.UpdateInDb(db)
+	if err != nil {
+		logger.Panic(err)
+	}
+
+	os.Exit(2)
 
 	go sync.SyncMenuServiceWithRecovered()
 	go telegram.BotStart()
