@@ -308,13 +308,31 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 	switch typeOrder {
 	case 0:
 		logger.Info("Запускаем обработку заказа")
+
+		menu, err := cache.GetMenu()
+		if err != nil {
+			return err
+		}
+
+		menuitemsRK7ByWooID, err := menu.GetMenuitemsRK7ByWooID()
+		if err != nil {
+			return err
+		}
+
+		var dishs []*modelsRK7API.Dish
 		if len(WebhookCreatOrder.LineItems) > 0 {
 			for _, LineItems := range WebhookCreatOrder.LineItems {
-				logger.Debug(
-					LineItems.ProductId,
-					LineItems.Name,
-					LineItems.Quantity,
-					LineItems.Price)
+				logger.Debugln(LineItems.ProductId, LineItems.Name, LineItems.Quantity, LineItems.Price)
+				if menuitem, found := menuitemsRK7ByWooID[LineItems.ProductId]; found {
+					dishs = append(dishs, &modelsRK7API.Dish{
+						Code:     menuitem.Code,
+						Quantity: LineItems.Quantity * 1000,
+					})
+				} else {
+					errorText := fmt.Sprintf("При создании заказа не удалось найти блюдо: ID=%d, Name=%s",
+						LineItems.ProductId, LineItems.Name)
+					return errors.New(errorText)
+				}
 			}
 		}
 
@@ -348,15 +366,19 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 		logger.Debug("DurationRK: ", DurationRK)
 		logger.Debug("Deposit: ", Deposit)
 
-		//var order *modelsRK7API.Order
-		//отправить CreateOrder
-
-		_, err := RK7API.CreateOrder(Order)
+		order, err := RK7API.CreateOrder(Order)
 		if err != nil {
-			logger.Infof("Ошибка при создании заказа RK, error: %v", err)
+			logger.Errorf("Ошибка при создании заказа RK, error: %v", err)
 			return errors.Wrap(err, "ошибка в RK7API.CreateOrder")
 		} else {
 			logger.Info("Заказ в RK создан успешно")
+			_, err := RK7API.SaveOrder(order.VisitID, order.Guid, cfg.RK7MID.StationCode, dishs, nil)
+			if err != nil {
+				logger.Errorf("Ошибка при добавлении блюд в заказе RK, error: %v", err)
+				return errors.Wrap(err, "ошибка в RK7API.SaveOrder")
+			} else {
+				logger.Info("Блюда в RK созданы успешно")
+			}
 		}
 
 	case 1:

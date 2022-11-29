@@ -35,7 +35,7 @@ type RK7API interface {
 	GetOrder(Guid string) (*models.RK7QueryResultGetOrder, error)
 
 	CreateOrder(Order *models.OrderInRK7QueryCreateOrder) (*models.RK7QueryResultCreateOrder, error)
-	SaveOrder(Visit int, Guid string, Station int, Dishs *[]models.Dish, Prepay *models.Prepay) (*models.RK7QueryResultSaveOrder, error)
+	SaveOrder(Visit int, Guid string, Station int, Dishs []*models.Dish, Prepay *models.Prepay) (*models.RK7QueryResultSaveOrder, error)
 	UpdateOrder(Guid string, fields ...models.FieldUpdateOrder) (*models.RK7QueryResultUpdateOrder, error)
 
 	GetXMLLicenseInstanceSeqNumber(Anchor, LicenseToken, Guid string) (*models.RK7QueryResultGetXMLLicenseInstanceSeqNumber, error)
@@ -267,7 +267,7 @@ func (r *rk7api) GetOrderList() (*models.RK7QueryResultGetOrderList, error) {
 	return RK7QueryResultGetOrderList, nil
 }
 
-func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs *[]models.Dish, Prepay *models.Prepay) (*models.RK7QueryResultSaveOrder, error) {
+func (r *rk7api) SaveOrder(Visit int, Guid string, StationCode int, Dishs []*models.Dish, Prepay *models.Prepay) (*models.RK7QueryResultSaveOrder, error) {
 
 	logger := logging.GetLogger()
 	logger.Println("SaveOrder Start")

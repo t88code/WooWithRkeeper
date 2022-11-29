@@ -23,6 +23,7 @@ type Menu interface {
 
 	GetMenuitems() ([]*modelsRK7API.MenuitemItem, error)
 	GetMenuitemsRK7ByIdent() (map[int]*modelsRK7API.MenuitemItem, error)
+	GetMenuitemsRK7ByWooID() (map[int]*modelsRK7API.MenuitemItem, error)
 
 	GetCateglistRK7() ([]*modelsRK7API.Categlist, error)
 	GetCateglistsRK7ByIdent() (map[int]*modelsRK7API.Categlist, error)
@@ -71,6 +72,16 @@ type menu struct {
 	//WOO - ProductCategories
 	ProductCategoriesWooByID   map[int]*modelsWOOAPI.ProductCategory
 	ProductCategoriesWooBySlug map[string]*modelsWOOAPI.ProductCategory
+}
+
+func (m *menu) GetMenuitemsRK7ByWooID() (map[int]*modelsRK7API.MenuitemItem, error) {
+	if len(m.MenuitemsRK7ByWooID) == 0 {
+		err := m.RefreshMenuitems()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return m.MenuitemsRK7ByWooID, nil
 }
 
 func (m *menu) AddProductToCache(product *modelsWOOAPI.Product) error {
@@ -416,10 +427,15 @@ func (m *menu) RefreshMenuitems() error {
 	logger.Debugf("Длина списка MenuitemItemInRK7 = %d\n", len(m.MenuitemsRK7))
 
 	m.MenuitemsRK7ByIdent = make(map[int]*modelsRK7API.MenuitemItem)
+	m.MenuitemsRK7ByWooID = make(map[int]*modelsRK7API.MenuitemItem)
 	for i, item := range m.MenuitemsRK7 {
 		m.MenuitemsRK7ByIdent[item.ItemIdent] = m.MenuitemsRK7[i]
+		if item.WOO_ID != 0 {
+			m.MenuitemsRK7ByWooID[item.WOO_ID] = m.MenuitemsRK7[i]
+		}
 	}
 	logger.Debugf("Длина списка MenuRK7MapByIdent = %d\n", len(m.MenuitemsRK7ByIdent))
+	logger.Debugf("Длина списка MenuitemsRK7ByWooID = %d\n", len(m.MenuitemsRK7ByWooID))
 	logger.Debugf("RefreshMenuitems. Время обновления: %s", time.Now().Sub(timeStart))
 	return nil
 }

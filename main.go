@@ -40,6 +40,7 @@ func main() {
 	cfg := config.GetConfig()
 
 	go sync.SyncMenuServiceWithRecovered()
+
 	go telegram.BotStart()
 
 	router := httprouter.New()
