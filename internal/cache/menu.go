@@ -372,7 +372,7 @@ func (m *menu) RefreshCateglist() error {
 		modelsRK7API.IgnoreEnums("1"),
 		modelsRK7API.WithChildItems("3"),
 		modelsRK7API.WithMacroProp("1"),
-		modelsRK7API.PropMask("items.(Ident,ItemIdent,GUIDString,Code,Name,MainParentIdent,Status,Parent,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME)"))
+		modelsRK7API.PropMask("items.(Ident,ItemIdent,GUIDString,Code,Name,MainParentIdent,Status,Parent,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO_SYNC)"))
 	if err != nil {
 		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetRefData")
 	}
@@ -408,7 +408,7 @@ func (m *menu) RefreshMenuitems() error {
 		Source:      fmt.Sprintf("PRICETYPES-%d", cfg.RK7.PRICETYPE),
 		Destination: "PRICETYPES"})
 
-	propMask := fmt.Sprintf("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^%d,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO_IMAGE,genWOO,genTEST,CLASSIFICATORGROUPS^%d)",
+	propMask := fmt.Sprintf("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^%d,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO_IMAG*,CLASSIFICATORGROUPS^%d)",
 		cfg.RK7.PRICETYPE,
 		cfg.RK7.CLASSIFICATORGROUPS)
 
@@ -500,25 +500,31 @@ func (m *menu) RefreshDishRests() error {
 	logger.Debug("Start RefreshDishRests")
 	defer logger.Debug("End RefreshDishRests")
 	timeStart := time.Now()
-	RK7API := rk7api.GetAPI("MID")
 
-	logger.Debug("Получить список всех блюд из стоп-листа")
+	cfg := config.GetConfig()
+	if cfg.MENUSYNC.SyncStopList != 0 {
+		RK7API := rk7api.GetAPI("MID")
 
-	Rk7QueryResultGetDishRests, err := RK7API.GetDishRests()
-	if err != nil {
-		return errors.Wrap(err, "Ошибка при выполнении rk7api.GetDishRests")
+		logger.Debug("Получить список всех блюд из стоп-листа")
+
+		Rk7QueryResultGetDishRests, err := RK7API.GetDishRests()
+		if err != nil {
+			return errors.Wrap(err, "Ошибка при выполнении rk7api.GetDishRests")
+		}
+
+		m.DishRests = Rk7QueryResultGetDishRests.DishRest
+		logger.Debugf("Длина списка DishRests = %d\n", len(m.DishRests))
+
+		m.DishRestsByIdent = make(map[int]*modelsRK7API.DishRest)
+		for i, dish := range m.DishRests {
+			m.DishRestsByIdent[dish.ID] = m.DishRests[i]
+		}
+		logger.Debugf("Длина списка DishRests = %d\n", len(m.DishRests))
+		logger.Debugf("RefreshDishRests. Время обновления: %s", time.Now().Sub(timeStart))
+	} else {
+		m.DishRests = make([]*modelsRK7API.DishRest, 0)
+		m.DishRestsByIdent = make(map[int]*modelsRK7API.DishRest)
 	}
-
-	m.DishRests = Rk7QueryResultGetDishRests.DishRest
-	logger.Debugf("Длина списка DishRests = %d\n", len(m.DishRests))
-
-	m.DishRestsByIdent = make(map[int]*modelsRK7API.DishRest)
-	for i, dish := range m.DishRests {
-		m.DishRestsByIdent[dish.ID] = m.DishRests[i]
-	}
-	logger.Debugf("Длина списка DishRests = %d\n", len(m.DishRests))
-	logger.Debugf("RefreshDishRests. Время обновления: %s", time.Now().Sub(timeStart))
-
 	return nil
 }
 

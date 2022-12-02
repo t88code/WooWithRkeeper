@@ -46,6 +46,7 @@ type (
 		}
 		MENUSYNC struct {
 			Timeout        int
+			SyncStopList   int
 			SyncImages     int
 			SyncMenuitems  int
 			SyncCateglist  int

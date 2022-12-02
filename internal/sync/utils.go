@@ -1,7 +1,7 @@
 package sync
 
 import (
-	"WooWithRkeeper/internal/database"
+	"WooWithRkeeper/internal/database/model"
 	"WooWithRkeeper/internal/rk7api"
 	"WooWithRkeeper/pkg/logging"
 	"fmt"
@@ -62,7 +62,7 @@ func VerifyVersion(rk7api rk7api.RK7API, db *sqlx.DB, RefName string) (bool, err
 	}
 
 	//получить версию меню из DB
-	type Version database.Version
+	type Version model.Version
 	var Versions []Version
 	query := fmt.Sprintf(`SELECT Version FROM Version WHERE Name='%s'`, RefName)
 	err = db.Select(&Versions, query)

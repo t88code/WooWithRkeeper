@@ -14,4 +14,5 @@ type Categlist struct {
 	WOO_ID          int    `xml:"genWOO_ID,attr"`
 	WOO_PARENT_ID   int    `xml:"genWOO_PARENT_ID,attr"`
 	WOO_LONGNAME    string `xml:"genWOO_LONGNAME,attr"`
+	WOO_SYNC        int    `xml:"genWOO_SYNC,attr"`
 }

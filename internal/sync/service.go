@@ -157,7 +157,7 @@ func SyncMenuService() {
 			timeStartSyncImages := time.Now()
 			err := SyncImages()
 			if err != nil {
-				telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации картинок SyncMenu: \n%v\n", err))
+				logger.Errorf("Ошибка синхронизации картинки; %v", err)
 			} else {
 				logger.Infof("Синхронизация картинок выполнена успешно")
 			}

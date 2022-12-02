@@ -7,7 +7,6 @@ import (
 	"WooWithRkeeper/internal/handlers/httphandler"
 	"WooWithRkeeper/internal/license"
 	"WooWithRkeeper/internal/rk7api"
-	modelsRK7API "WooWithRkeeper/internal/rk7api/models"
 	"WooWithRkeeper/internal/sync"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/version"
@@ -17,7 +16,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
-	"os"
 )
 
 //TODO сделать логировование Debug
@@ -40,35 +38,6 @@ func main() {
 
 	check.Check()
 	cfg := config.GetConfig()
-
-	RK7API := rk7api.GetAPI("REF")
-
-	propMask := fmt.Sprintf("items.(Code,Name,Ident,ItemIdent,GUIDString,MainParentIdent,ExtCode,PRICETYPES^%d,CategPath,Status,genIDBX24,genSectionIDBX24,genWOO_ID,genWOO_PARENT_ID,genWOO_LONGNAME,genWOO1_IMAG*,genWOO,genTEST,CLASSIFICATORGROUPS^%d)",
-		cfg.RK7.PRICETYPE,
-		cfg.RK7.CLASSIFICATORGROUPS)
-
-	Rk7QueryResultGetRefDataMenuitems, err := RK7API.GetRefData("Menuitems", nil,
-		modelsRK7API.OnlyActive("0"), //неактивные будем менять статус на N ?или может удалять? в bitrix24
-		modelsRK7API.IgnoreEnums("1"),
-		modelsRK7API.WithChildItems("3"),
-		modelsRK7API.WithMacroProp("1"),
-		modelsRK7API.PropMask(propMask))
-	if err != nil {
-		panic(err)
-	}
-
-	menuitems := (Rk7QueryResultGetRefDataMenuitems).(*modelsRK7API.RK7QueryResultGetRefDataMenuitems)
-	m := menuitems.RK7Reference.Items.Item
-
-	for _, item := range m {
-		fmt.Println(item.Name, item.WOO_IMAGE_NAME_1)
-		if item.WOO_IMAGE_NAME_1 != "" {
-			fmt.Println(item)
-			os.Exit(4)
-		}
-	}
-
-	os.Exit(2)
 
 	go sync.SyncMenuServiceWithRecovered()
 	go telegram.BotStart()
