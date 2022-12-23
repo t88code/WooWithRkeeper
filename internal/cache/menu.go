@@ -34,6 +34,7 @@ type Menu interface {
 	//WOO
 	RefreshProducts() error
 	RefreshProductCategories() error
+
 	GetProductsWooByID() (map[int]*modelsWOOAPI.Product, error)
 
 	GetProductCategoriesWooByID() (map[int]*modelsWOOAPI.ProductCategory, error)

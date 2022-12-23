@@ -1,4 +1,4 @@
-package model
+package image
 
 import (
 	"WooWithRkeeper/pkg/logging"
@@ -8,17 +8,16 @@ import (
 )
 
 const (
-	IMAGE_STATUS_IGNORE                           = "Ignore"                     // Игнор
-	IMAGE_STATUS_WOO_NOT_FOUND                    = "WooNotFound"                // Product не найден в WOO
-	IMAGE_STATUS_RK7_WOO_ID_NOT_FOUND             = "Rk7WooIDNotFound"           // Не указан WOO_ID в RK7
-	IMAGE_STATUS_RK7_IMAGE_NAME_NOT_FOUND         = "Rk7ImageNameNotFound"       // Удаляем в WOO - Не указан IMAGE_NAME в RK7
-	IMAGE_STATUS_FILE_NOT_FOUND                   = "FileNotFound"               // Удаляем в WOO - Не найдена файл картинки
-	IMAGE_STATUS_NEED_UPDATE_BY_DIFF_NAME         = "NeedUpdateByDiffName"       // Обновляем - имя картинка изменилась
-	IMAGE_STATUS_NEED_UPDATE_BY_DIFF_DATE         = "NeedUpdateByDiffDate"       // Обновляем - дата картинки изменилась
-	IMAGE_STATUS_NEED_UPDATE_BY_NOT_FOUND_IN_DB   = "NeedUpdateByNotFoundInDb"   // Сообщаем об ошибке
-	IMAGE_STATUS_NEED_UPDATE_BY_FIND_DOUBLE_IN_DB = "NeedUpdateByFindDoubleInDb" // Сообщаем об ошибке
-	IMAGE_STATUS_NO_NEED_UPDATE                   = "NoNeedUpdate"               // Проверить, что все ок
-
+	IMAGE_STATUS_IGNORE                           = "IMAGE_STATUS_IGNORE"                           // Игнор
+	IMAGE_STATUS_WOO_NOT_FOUND                    = "IMAGE_STATUS_WOO_NOT_FOUND"                    // Product не найден в WOO
+	IMAGE_STATUS_RK7_WOO_ID_NOT_FOUND             = "IMAGE_STATUS_RK7_WOO_ID_NOT_FOUND"             // Не указан WOO_ID в RK7
+	IMAGE_STATUS_RK7_IMAGE_NAME_NOT_FOUND         = "IMAGE_STATUS_RK7_IMAGE_NAME_NOT_FOUND"         // Удаляем в WOO - Не указан IMAGE_NAME в RK7
+	IMAGE_STATUS_FILE_NOT_FOUND                   = "IMAGE_STATUS_FILE_NOT_FOUND"                   // Удаляем в WOO - Не найдена файл картинки
+	IMAGE_STATUS_NEED_UPDATE_BY_DIFF_NAME         = "IMAGE_STATUS_NEED_UPDATE_BY_DIFF_NAME"         // Обновляем - имя картинка изменилась
+	IMAGE_STATUS_NEED_UPDATE_BY_DIFF_DATE         = "IMAGE_STATUS_NEED_UPDATE_BY_DIFF_DATE"         // Обновляем - дата картинки изменилась
+	IMAGE_STATUS_NEED_UPDATE_BY_NOT_FOUND_IN_DB   = "IMAGE_STATUS_NEED_UPDATE_BY_NOT_FOUND_IN_DB"   // Сообщаем об ошибке
+	IMAGE_STATUS_NEED_UPDATE_BY_FIND_DOUBLE_IN_DB = "IMAGE_STATUS_NEED_UPDATE_BY_FIND_DOUBLE_IN_DB" // Сообщаем об ошибке
+	IMAGE_STATUS_NO_NEED_UPDATE                   = "IMAGE_STATUS_NO_NEED_UPDATE"                   // Проверить, что все ок
 )
 
 type Image struct {
@@ -31,10 +30,11 @@ type Image struct {
 	Status   sql.NullString `db:"Status"`   //todo Status https://docs.google.com/spreadsheets/d/1oZ7jDxDHMfHvsLfN90HYmV3Cdj6uO_hS4MVBGJzuKqU/edit#gid=1756609729
 }
 
-func (i *Image) SelectByStatus(db *sqlx.DB) ([]*Image, error) {
+func (i *Image) SelectByStatusOrderByIdentRKAndPos(db *sqlx.DB) ([]*Image, error) {
+
 	logger := logging.GetLogger()
-	logger.Debug("Start Image.SelectByIdentRKAndPos")
-	defer logger.Debug("End Image.SelectByIdentRKAndPos")
+	logger.Debug("Start Image.SelectByStatusOrderByIdentRKAndPos")
+	defer logger.Debug("End Image.SelectByStatusOrderByIdentRKAndPos")
 
 	var err error
 	var imagesInDb []*Image
@@ -42,7 +42,7 @@ func (i *Image) SelectByStatus(db *sqlx.DB) ([]*Image, error) {
 
 	logger.Debug("Выполняем поиск записей в таблице Images")
 	if i.Status.Valid {
-		query = "SELECT * FROM Image WHERE Status=$1;"
+		query = "SELECT * FROM Image WHERE Status=$1 ORDER BY IdentRK, Pos;"
 		err = db.Select(&imagesInDb, query, i.Status)
 		logger.Debugf("SELECT:\n%s(%s)", query, i.Status.String)
 	} else {
@@ -77,6 +77,7 @@ func (i *Image) SelectByIdentRKAndPos(db *sqlx.DB) ([]*Image, error) {
 		err = db.Select(&imagesInDb, query, i.IdentRK)
 		logger.Debugf("SELECT:\n%s(%d)", query, i.IdentRK)
 	}
+
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed SELECT to dbsqlite; query:\n%s(%d, %v)", query, i.IdentRK, i.Pos)
 	}
@@ -101,10 +102,24 @@ func (i *Image) UpdateByIdentRKAndPos(db *sqlx.DB) error {
 	}
 
 	logger.Debugf("Количество найденных строк: %d", len(imagesInDb))
+
+	tx := db.MustBegin()
+	defer func() {
+		if err != nil {
+			logger.Error(err)
+			err := tx.Rollback()
+			if err != nil {
+				logger.Errorf("failed in Rollback(); %v", err)
+				return
+			} else {
+				logger.Info("Rollback() is done")
+			}
+		}
+	}()
+
 	switch {
 	case len(imagesInDb) == 0:
 		logger.Debug("Строка не найдена, требуется ее добавить")
-		tx := db.MustBegin()
 		query = "INSERT INTO Image (IdentRK, ModTime, Name, Pos, IdentWOO, Status) VALUES ($1, $2, $3, $4, $5, $6);"
 		logger.Debugf("INSERT:\n%s(%v)", query, i)
 		tx.MustExec(query, i.IdentRK, i.ModTime, i.Name, i.Pos, i.IdentWOO, i.Status)
@@ -130,7 +145,7 @@ func (i *Image) UpdateByIdentRKAndPos(db *sqlx.DB) error {
 				query = "UPDATE Image SET ModTime=:ModTime, Name=:Name, IdentWOO=:IdentWOO, Status=:Status WHERE IdentRK=:IdentRK;"
 			}
 			logger.Debugf("UPDATE:\n%s(%v)", query, i)
-			_, err = db.NamedExec(query,
+			_, err = tx.NamedExec(query,
 				map[string]interface{}{
 					"IdentRK":  i.IdentRK,
 					"ModTime":  i.ModTime,
@@ -139,6 +154,8 @@ func (i *Image) UpdateByIdentRKAndPos(db *sqlx.DB) error {
 					"IdentWOO": i.IdentWOO,
 					"Status":   i.Status,
 				})
+
+			err := tx.Commit()
 			if err != nil {
 				return errors.Wrapf(err, "failed UPDATE to dbsqlite; query:\n%s(%v)", query, i)
 			} else {
@@ -151,7 +168,6 @@ func (i *Image) UpdateByIdentRKAndPos(db *sqlx.DB) error {
 		}
 	case len(imagesInDb) > 1:
 		logger.Debug("Необходимо удалить дублирующие строки с полями IdentRK+Pos")
-		tx := db.MustBegin()
 		if i.Pos.Valid {
 			query = "DELETE FROM Image WHERE IdentRK=$1 AND Pos=$2;"
 			tx.MustExec(query, i.IdentRK, i.Pos)
@@ -161,25 +177,20 @@ func (i *Image) UpdateByIdentRKAndPos(db *sqlx.DB) error {
 			tx.MustExec(query, i.IdentRK)
 			logger.Debugf("DELETE:\n%s(%d)", query, i.IdentRK)
 		}
-		err = tx.Commit()
+
+		logger.Debug("Строки удалены успешно")
+		logger.Debug("Требуется добавить строку")
+		query1 := "INSERT INTO Image (IdentRK, ModTime, Name, Pos, IdentWOO, Status) VALUES ($1, $2, $3, $4, $5, $6);"
+		logger.Debugf("INSERT:\n%s(%v)", query1, i)
+		tx.MustExec(query1, i.IdentRK, i.ModTime, i.Name, i.Pos, i.IdentWOO, i.Status)
+		err := tx.Commit()
 		if err != nil {
-			return errors.Wrapf(err, "failed DELETE in dbsqlite; query:\n%s(%d)", query, i.IdentRK)
+			return errors.Wrapf(err, "failed DELETE in dbsqlite; query:\n%s(%d); failed INSERT to dbsqlite; query:\n%s(%v)", query, i.IdentRK, query1, i)
 		} else {
-			logger.Debug("Строки удалены успешно")
-			logger.Debug("Требуется добавить строку")
-			tx := db.MustBegin()
-			query = "INSERT INTO Image (IdentRK, ModTime, Name, Pos, IdentWOO, Status) VALUES ($1, $2, $3, $4, $5, $6);"
-			logger.Debugf("INSERT:\n%s(%v)", query, i)
-			tx.MustExec(query, i.IdentRK, i.ModTime, i.Name, i.Pos, i.IdentWOO, i.Status)
-			err := tx.Commit()
-			if err != nil {
-				return errors.Wrapf(err, "failed INSERT to dbsqlite; query:\n%s(%v)", query, i)
-			} else {
-				logger.Debug("Строка добавлена успешно")
-				return nil
-			}
+			logger.Debug("Строка добавлена успешно")
+			return nil
 		}
 	default:
-		return errors.New("Неизвестная ошибка")
+		return nil
 	}
 }

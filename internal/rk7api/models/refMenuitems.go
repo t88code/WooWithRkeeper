@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 type MenuitemItem struct {
 	Code                int    `xml:"Code,attr"`
 	Ident               int    `xml:"Ident,attr"`
@@ -30,7 +32,7 @@ type MenuitemItem struct {
 }
 
 func (m *MenuitemItem) GetImageNames() (imageNames []string) {
-	return []string{
+	imageNames = []string{
 		m.WOO_IMAGE_NAME_1,
 		m.WOO_IMAGE_NAME_2,
 		m.WOO_IMAGE_NAME_3,
@@ -42,6 +44,14 @@ func (m *MenuitemItem) GetImageNames() (imageNames []string) {
 		m.WOO_IMAGE_NAME_9,
 		m.WOO_IMAGE_NAME_10,
 	}
+
+	for i, name := range imageNames {
+		if name != "" {
+			imageNames[i] = fmt.Sprintf("%s.jpg", name)
+		}
+	}
+
+	return imageNames
 }
 
 func (m *MenuitemItem) ImageNamesExistLen() (len int) {

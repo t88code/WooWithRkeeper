@@ -55,7 +55,7 @@ type Product struct {
 	CrossSellIds      []interface{} `json:"cross_sell_ids,omitempty"`
 	ParentId          int           `json:"parent_id,omitempty"`
 	PurchaseNote      string        `json:"purchase_note,omitempty"`
-	Categories        []*Categories `json:"categories,omitempty"`
+	Categories        []*Category   `json:"categories,omitempty"`
 	Tags              []interface{} `json:"tags,omitempty"`
 	//Images            []interface{} `json:"images,omitempty"`
 	Images            []ProductImage `json:"images,omitempty"`
@@ -87,7 +87,7 @@ type Dimensions struct {
 	Height string `json:"height,omitempty"`
 }
 
-type Categories struct {
+type Category struct {
 	Id   int    `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 	Slug string `json:"slug,omitempty"`

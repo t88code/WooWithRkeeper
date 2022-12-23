@@ -5,6 +5,9 @@ import (
 	"WooWithRkeeper/internal/config"
 	"WooWithRkeeper/internal/database"
 	"WooWithRkeeper/internal/rk7api"
+	"WooWithRkeeper/internal/sync/categlist"
+	"WooWithRkeeper/internal/sync/images"
+	"WooWithRkeeper/internal/sync/menuitem"
 	"WooWithRkeeper/internal/telegram"
 	"WooWithRkeeper/internal/wooapi"
 	"WooWithRkeeper/pkg/logging"
@@ -13,6 +16,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"time"
 )
+
+const SYNC_CATEGLIST_NEED_UPDATE = "Need update"
 
 //func SyncMenuServiceWithRecovered()
 func SyncMenuServiceWithRecovered() {
@@ -68,7 +73,6 @@ func SyncMenuService() {
 	cfg := config.GetConfig()
 	RK7API := rk7api.GetAPI("REF")
 
-	//TODO обработка ошибок базы!!
 	DB, err := sqlx.Connect("sqlite3", database.DB_NAME)
 	if err != nil {
 		logger.Fatalf("failed sqlx.Connect; %v", err)
@@ -86,13 +90,9 @@ func SyncMenuService() {
 	}
 
 	timeStart := time.Now()
-	err = m.RefreshMenu()
-	if err != nil {
-		logger.Errorf("failed RefreshMenu(); %v", err)
-		telegram.SendMessageToTelegramWithLogError(err.Error())
-	}
-	timeRefreshMenu := time.Now().Sub(timeStart)
 	for {
+		_ = wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
+
 		var timeUpdateSyncCateglist, timeUpdateSyncMenuitems, timeUpdateSyncImages time.Duration
 
 		if cfg.MENUSYNC.SyncCateglist == 1 {
@@ -105,11 +105,11 @@ func SyncMenuService() {
 				logger.Info("Проверка не требуется")
 			} else {
 				logger.Println("Требуется обновление Categlist")
-				err := SyncCateglist()
+				err := categlist.SyncCateglist(DB)
 				if err != nil {
 					if err.Error() == SYNC_CATEGLIST_NEED_UPDATE {
-						logger.Warning("Повторно обновляем, т.к. при создании папок совпало наименование папок")
-						err := SyncCateglist()
+						logger.Debug("Повторно обновляем, т.к. при создании папок совпало наименование папок")
+						err := categlist.SyncCateglist(DB)
 						if err != nil {
 							logger.Error("Ошибка после повторной синхронизации")
 							telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка после повторной синхронизации Categlist SyncMenu: \n%v\n", err))
@@ -142,7 +142,7 @@ func SyncMenuService() {
 				logger.Info("Проверка не требуется")
 			} else {
 				logger.Println("Требуется обновление меню")
-				err := SyncMenuitems()
+				err := menuitem.SyncMenuitems()
 				if err != nil {
 					telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка при синхронизации меню SyncMenu: \n%v\n", err))
 				} else {
@@ -155,7 +155,7 @@ func SyncMenuService() {
 
 		if cfg.MENUSYNC.SyncImages == 1 {
 			timeStartSyncImages := time.Now()
-			err := SyncImages()
+			err := images.SyncImages(DB)
 			if err != nil {
 				logger.Errorf("Ошибка синхронизации картинки; %v", err)
 			} else {
@@ -166,7 +166,6 @@ func SyncMenuService() {
 		}
 
 		logger.Info("Тайминги по обновлениями:")
-		logger.Infof("RefreshMenu: %s", timeRefreshMenu)
 		if cfg.MENUSYNC.SyncCateglist == 1 {
 			logger.Infof("Categlist: %s", timeUpdateSyncCateglist)
 		}
@@ -188,7 +187,6 @@ func SyncMenuService() {
 			logger.Errorf("failed RefreshMenu(); %v", err)
 			telegram.SendMessageToTelegramWithLogError(err.Error())
 		}
-		timeRefreshMenu = time.Now().Sub(timeStart)
 	}
 }
 

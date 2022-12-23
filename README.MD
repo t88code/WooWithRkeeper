@@ -144,4 +144,7 @@ http://new.hotelslovakia.ru/restoran-le-nuar/
   * DateCreated string = WebhookCreatOrder.DateCreated
   * Props - DateCreated
 
-    
+
+## Изменить на нет в наличии
+
+* menuitemsNeedDelInWoo - установить на нет в наличии
