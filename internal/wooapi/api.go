@@ -28,7 +28,7 @@ type WOOAPI interface {
 	ProductCategoryGet(ID int) (*models.ProductCategory, error)
 	ProductCategoryList(opts ...optionsWoo.Option) ([]*models.ProductCategory, error)
 	ProductCategoryListAll() ([]*models.ProductCategory, error)
-	ProductCategoryAdd(c *models.ProductCategory) (*models.ProductCategory, error)
+	ProductCategoryAdd(c *models.ProductCategory) (*models.ProductCategory, int, error)
 	ProductCategoryUpdate(pc *models.ProductCategory) (*models.ProductCategory, error)
 	ProductCategoryDelete(ID int, opts ...optionsWoo.Option) error
 }
@@ -547,7 +547,7 @@ func (w *wooapi) ProductCategoryListAll() ([]*models.ProductCategory, error) {
 	return productsCategory, nil
 }
 
-func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductCategory, error) {
+func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductCategory, int, error) {
 	logger := logging.GetLogger()
 	logger.Println("ProductCategoryAdd:>Start")
 	defer logger.Println("ProductCategoryAdd:>End")
@@ -556,12 +556,12 @@ func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductC
 	logger.Debugf("Endpoint: %s", endpoint)
 
 	if c.Name == "" {
-		return nil, errors.New("не указано имя категории")
+		return nil, 0, errors.New("не указано имя категории")
 	}
 
 	if r, err := w.api.Post(endpoint, nil, c); err != nil {
 		w.requestTime = time.Now()
-		return nil, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
+		return nil, 0, errors.Wrapf(err, "ошибка при отправке запроса в Woo Api, endpoint:%s", endpoint)
 	} else if r.StatusCode != http.StatusCreated { //TODO надо подумать что значит статус 200 и будет ли он возникать
 		w.requestTime = time.Now()
 		defer func(Body io.ReadCloser) {
@@ -571,16 +571,21 @@ func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductC
 			}
 		}(r.Body)
 		if bodyBytes, err := ioutil.ReadAll(r.Body); err != nil {
-			return nil, errors.Wrapf(err, "ошибка при ioutil.ReadAll(r.Body): error: %v", err)
+			return nil, 0, errors.Wrapf(err, "ошибка при ioutil.ReadAll(r.Body): error: %v", err)
 		} else {
 
 			logger.Debugf(string(bodyBytes))
 			var ErrorWoo models.ErrorWoo
 			err := json.Unmarshal(bodyBytes, &ErrorWoo)
 			if err != nil {
-				return nil, errors.Wrapf(err, "ошибка при json.Unmarshal(): error: %v", err)
+				return nil, 0, errors.Wrapf(err, "ошибка при json.Unmarshal(): error: %v", err)
 			}
-			return nil, &ErrorWoo
+
+			if ErrorWoo.Message == "Элемент с указанным именем уже существует у родительского элемента." {
+				return nil, ErrorWoo.Data.ResourceId, &ErrorWoo
+			} else {
+				return nil, 0, &ErrorWoo
+			}
 		}
 	} else {
 		w.requestTime = time.Now()
@@ -591,16 +596,16 @@ func (w *wooapi) ProductCategoryAdd(c *models.ProductCategory) (*models.ProductC
 			}
 		}(r.Body)
 		if bodyBytes, err := ioutil.ReadAll(r.Body); err != nil {
-			return nil, errors.Wrapf(err, "ошибка при ioutil.ReadAll(r.Body): error: %v", err)
+			return nil, 0, errors.Wrapf(err, "ошибка при ioutil.ReadAll(r.Body): error: %v", err)
 		} else {
 
 			logger.Debugf(string(bodyBytes))
 			var productCategory models.ProductCategory
 			err := json.Unmarshal(bodyBytes, &productCategory)
 			if err != nil {
-				return nil, errors.Wrapf(err, "ошибка при json.Unmarshal(): error: %v", err)
+				return nil, 0, errors.Wrapf(err, "ошибка при json.Unmarshal(): error: %v", err)
 			}
-			return &productCategory, nil
+			return &productCategory, 0, nil
 		}
 	}
 }

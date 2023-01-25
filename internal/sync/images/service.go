@@ -16,20 +16,26 @@ func SyncImages(db *sqlx.DB) error {
 	defer logger.Debug("End SyncImages")
 	var err error
 
+	imagesSync := make([]ImageSync, 0)
+
 	// 1 этап - Синхронизация файлов картинок из папки с Woo.Media/DB.ImageFiles
+	// Картинки закачиваются в Woo.Media/DB.ImageFiles
 	err = HandlerImageFileToDb(db)
 	if err != nil {
 		return errors.Wrap(err, "failed in HandlerImageFileToDb")
 	}
 
 	// 2 этап - Синхронизация Menuitems c DB.Image
-	err = HandlerMenuitemsToDbImage(db)
+	// Предварительная проверка по всем условиям в Menuitems
+	// Простановка статусов в DB.Image
+	err = HandlerMenuitemsToDbImage(db, &imagesSync)
 	if err != nil {
 		return errors.Wrap(err, "failed in HandlerMenuitemsToDbImage")
 	}
 
 	// 3 этап - Синхронизация DB.Image/DB.ImageFiles с Woo.Product.Image
-	err = HandlerDbImage(db)
+	// Обработка статусов
+	err = HandlerDbImage(&imagesSync)
 	if err != nil {
 		return errors.Wrap(err, "failed in HandlerDbImage")
 	}

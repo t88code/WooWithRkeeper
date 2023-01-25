@@ -35,11 +35,10 @@ func main() {
 	v := version.GetVersion()
 	logger.Infof("Version %s", v.String())
 	defer logger.Info("End Main")
-
 	check.Check()
 	cfg := config.GetConfig()
 
-	go sync.SyncMenuServiceWithRecovered()
+	go sync.SyncMenuService()
 	go telegram.BotStart()
 
 	router := httprouter.New()
@@ -75,13 +74,13 @@ func init() {
 		logger.Error("failed in cache.NewCacheMenu()")
 	}
 
-	if database.Exists(database.DB_NAME) != true {
-		logger.Info(database.DB_NAME, " not exist")
-		err := database.CreateDB(database.DB_NAME)
+	if database.Exists(cfg.DBSQLITE.DB) != true {
+		logger.Info(cfg.DBSQLITE.DB, " not exist")
+		err := database.CreateDB(cfg.DBSQLITE.DB)
 		if err != nil {
-			logger.Fatalf("%s, %v", database.DB_NAME, err)
+			logger.Fatalf("%s, %v", cfg.DBSQLITE.DB, err)
 		}
 	} else {
-		logger.Info(database.DB_NAME, " exist")
+		logger.Info(cfg.DBSQLITE.DB, " exist")
 	}
 }

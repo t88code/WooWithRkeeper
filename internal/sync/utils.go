@@ -1,7 +1,7 @@
 package sync
 
 import (
-	"WooWithRkeeper/internal/database/model"
+	"WooWithRkeeper/internal/database"
 	"WooWithRkeeper/internal/rk7api"
 	"WooWithRkeeper/pkg/logging"
 	"fmt"
@@ -62,7 +62,7 @@ func VerifyVersion(rk7api rk7api.RK7API, db *sqlx.DB, RefName string) (bool, err
 	}
 
 	//получить версию меню из DB
-	type Version model.Version
+	type Version database.Version
 	var Versions []Version
 	query := fmt.Sprintf(`SELECT Version FROM Version WHERE Name='%s'`, RefName)
 	err = db.Select(&Versions, query)
@@ -112,8 +112,8 @@ func UpdateVersionInDB(db *sqlx.DB, RefName string, Version int) error {
 	logger.Println("Start UpdateVersionInDB")
 	defer logger.Println("End UpdateVersionInDB")
 
-	updateQuery := fmt.Sprintf(`UPDATE Version SET Version=%d WHERE Name='%s'`, Version, RefName)
-	exec := db.MustExec(updateQuery)
+	updateQuery := fmt.Sprintf("UPDATE Version SET Version=$1 WHERE Name='$2'")
+	exec := db.MustExec(updateQuery, Version, RefName)
 	_, err := exec.LastInsertId()
 	if err != nil {
 		return errors.Wrapf(err, "failed UPDATE: %s", updateQuery)

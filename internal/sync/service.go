@@ -3,7 +3,6 @@ package sync
 import (
 	"WooWithRkeeper/internal/cache"
 	"WooWithRkeeper/internal/config"
-	"WooWithRkeeper/internal/database"
 	"WooWithRkeeper/internal/rk7api"
 	"WooWithRkeeper/internal/sync/categlist"
 	"WooWithRkeeper/internal/sync/images"
@@ -14,47 +13,12 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"os"
+	"runtime/debug"
 	"time"
 )
 
 const SYNC_CATEGLIST_NEED_UPDATE = "Need update"
-
-//func SyncMenuServiceWithRecovered()
-func SyncMenuServiceWithRecovered() {
-	logger := logging.GetLogger()
-	logger.Println("Start Service SyncMenuServiceWithRecovered")
-	defer logger.Println("End Service SyncMenuServiceWithRecovered")
-
-	cfg := config.GetConfig()
-
-	index := 0 //количество перезапусков при панике
-	for {
-		SyncMenuService()
-		index++
-
-		_, err := cache.NewCacheMenu()
-		if err != nil {
-			logger.Error("failed in cache.NewCacheMenu()")
-		}
-
-		_ = wooapi.NewAPI(cfg.WOOCOMMERCE.URL, cfg.WOOCOMMERCE.Key, cfg.WOOCOMMERCE.Secret)
-
-		_, err = rk7api.NewAPI(cfg.RK7.URL, cfg.RK7.User, cfg.RK7.Pass, "REF")
-		if err != nil {
-			logger.Fatal("failed main init; rk7api.NewAPI; ", err)
-		}
-
-		_, err = rk7api.NewAPI(cfg.RK7MID.URL, cfg.RK7MID.User, cfg.RK7MID.Pass, "MID")
-		if err != nil {
-			logger.Fatal("failed main init; rk7api.NewAPI; ", err)
-		}
-
-		if index == 3 {
-			break
-		}
-	}
-	telegram.SendMessageToTelegramWithLogError("перезапуск SyncMenuService() прекращен")
-}
 
 //func SyncMenuService()
 func SyncMenuService() {
@@ -66,14 +30,17 @@ func SyncMenuService() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("произошла критическая ошибка, синхронизация будет перезапущена, ошибка: %v", r))
+			errorText := fmt.Sprintf("error: %v\nstack: %s", r, debug.Stack())
+			logger.Error(errorText)
+			telegram.SendMessageToTelegramWithLogError(errorText)
+			os.Exit(1)
 		}
 	}()
 
 	cfg := config.GetConfig()
 	RK7API := rk7api.GetAPI("REF")
 
-	DB, err := sqlx.Connect("sqlite3", database.DB_NAME)
+	DB, err := sqlx.Connect("sqlite3", cfg.DBSQLITE.DB)
 	if err != nil {
 		logger.Fatalf("failed sqlx.Connect; %v", err)
 	}
@@ -105,11 +72,11 @@ func SyncMenuService() {
 				logger.Info("Проверка не требуется")
 			} else {
 				logger.Println("Требуется обновление Categlist")
-				err := categlist.SyncCateglist(DB)
+				err := categlist.SyncCateglist()
 				if err != nil {
 					if err.Error() == SYNC_CATEGLIST_NEED_UPDATE {
 						logger.Debug("Повторно обновляем, т.к. при создании папок совпало наименование папок")
-						err := categlist.SyncCateglist(DB)
+						err := categlist.SyncCateglist()
 						if err != nil {
 							logger.Error("Ошибка после повторной синхронизации")
 							telegram.SendMessageToTelegramWithLogError(fmt.Sprintf("Ошибка после повторной синхронизации Categlist SyncMenu: \n%v\n", err))
@@ -155,12 +122,19 @@ func SyncMenuService() {
 
 		if cfg.MENUSYNC.SyncImages == 1 {
 			timeStartSyncImages := time.Now()
-			err := images.SyncImages(DB)
+
+			err := m.RefreshMenuitems()
 			if err != nil {
-				logger.Errorf("Ошибка синхронизации картинки; %v", err)
+				logger.Errorf("Ошибка синхронизации блюд(перед картинками); %v", err)
 			} else {
-				logger.Infof("Синхронизация картинок выполнена успешно")
+				err := images.SyncImages(DB)
+				if err != nil {
+					logger.Errorf("Ошибка синхронизации картинки; %v", err)
+				} else {
+					logger.Infof("Синхронизация картинок выполнена успешно")
+				}
 			}
+
 			timeUpdateSyncImages = time.Now().Sub(timeStartSyncImages)
 			logger.Infof("Время обновления Images: %s", timeUpdateSyncImages)
 		}

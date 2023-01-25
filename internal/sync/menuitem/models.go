@@ -17,7 +17,7 @@ const (
 	PARENT_SYNC_OFF  = "PARENT_SYNC_OFF"  // Обнуляем WOO/RK7 - Parent с выключенной синхронизацией или не активный, или корневой раздел
 	NOT_WOO_ID       = "NOT_WOO_ID"       // Создаем в WOO - Не указан WOO_ID
 	NOT_FOUND_IN_WOO = "NOT_FOUND_IN_WOO" // Создаем в WOO - Блюдо не найдено в WOO
-	NEED_UPDATE      = "NEED_UPDATE"      // Обновляем WOO - Папка RK7 не совпадает с WOO(свойства Name/LongName/WOO_ID)
+	NEED_UPDATE      = "NEED_UPDATE"      // Обновляем WOO - Папка RK7 не совпадает с WOO(свойства Name/LongName)
 	NOT_NEED_UPDATE  = "NOT_NEED_UPDATE"  // Обновление в WOO не требуется
 )
 

@@ -1,4 +1,4 @@
-package model
+package database
 
 type Version struct {
 	ID      int    `db:"ID"`

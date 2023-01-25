@@ -38,7 +38,6 @@ type Menu interface {
 	GetProductsWooByID() (map[int]*modelsWOOAPI.Product, error)
 
 	GetProductCategoriesWooByID() (map[int]*modelsWOOAPI.ProductCategory, error)
-	GetProductCategoriesWooBySlug() (map[string]*modelsWOOAPI.ProductCategory, error)
 
 	DeleteProductCategoryFromCache(ID int) error
 	AddProductCategoryToCache(category *modelsWOOAPI.ProductCategory) error
@@ -71,8 +70,7 @@ type menu struct {
 	ProductsWooByID map[int]*modelsWOOAPI.Product
 
 	//WOO - ProductCategories
-	ProductCategoriesWooByID   map[int]*modelsWOOAPI.ProductCategory
-	ProductCategoriesWooBySlug map[string]*modelsWOOAPI.ProductCategory
+	ProductCategoriesWooByID map[int]*modelsWOOAPI.ProductCategory
 }
 
 func (m *menu) GetMenuitemsRK7ByWooID() (map[int]*modelsRK7API.MenuitemItem, error) {
@@ -173,16 +171,10 @@ func (m *menu) AddProductCategoryToCache(category *modelsWOOAPI.ProductCategory)
 			m.ProductCategoriesWooByID = make(map[int]*modelsWOOAPI.ProductCategory)
 		}
 
-		if m.ProductCategoriesWooBySlug == nil {
-			m.ProductCategoriesWooBySlug = make(map[string]*modelsWOOAPI.ProductCategory)
-		}
-
 		lenProductCategoriesWooByID := len(m.ProductCategoriesWooByID)
-		lenProductCategoriesWooBySlug := len(m.ProductCategoriesWooBySlug)
 
 		logger.Debug("До добавления в кеш:")
 		logger.Debugf("len(ProductCategoriesWooByID)=%d", lenProductCategoriesWooByID)
-		logger.Debugf("len(ProductCategoriesWooBySlug)=%d", lenProductCategoriesWooBySlug)
 
 		if category.ID == 0 {
 			return errors.New(fmt.Sprintf("ProductCategoriesWooByID не был изменен при добавлении элемента Name=%s, ID=%d, Parent=%d, Slug=%s; ID=0",
@@ -193,29 +185,11 @@ func (m *menu) AddProductCategoryToCache(category *modelsWOOAPI.ProductCategory)
 		}
 		m.ProductCategoriesWooByID[category.ID] = category
 
-		if category.Slug == "" {
-			return errors.New(fmt.Sprintf("ProductCategoriesWooBySlug не был изменен при добавлении элемента Name=%s, ID=%d, Parent=%d, Slug=%s; Slug=''",
-				category.Name,
-				category.ID,
-				category.Parent,
-				category.Slug))
-		}
-		m.ProductCategoriesWooBySlug[category.Slug] = category
-
 		logger.Debug("После добавления в кеш:")
 		logger.Debugf("len(ProductCategoriesWooByID)=%d", len(m.ProductCategoriesWooByID))
-		logger.Debugf("len(ProductCategoriesWooBySlug)=%d", len(m.ProductCategoriesWooBySlug))
 
 		if lenProductCategoriesWooByID == len(m.ProductCategoriesWooByID) {
 			return errors.New(fmt.Sprintf("ProductCategoriesWooByID не был изменен при добавлении элемента Name=%s, ID=%d, Parent=%d, Slug=%s",
-				category.Name,
-				category.ID,
-				category.Parent,
-				category.Slug))
-		}
-
-		if lenProductCategoriesWooBySlug == len(m.ProductCategoriesWooBySlug) {
-			return errors.New(fmt.Sprintf("ProductCategoriesWooBySlug не был изменен при добавлении элемента Name=%s, ID=%d, Parent=%d, Slug=%s",
 				category.Name,
 				category.ID,
 				category.Parent,
@@ -234,20 +208,13 @@ func (m *menu) DeleteProductCategoryFromCache(WOOID int) error {
 	defer logger.Debug("End DeleteProductCategoryFromCache")
 
 	lenProductCategoriesWooByID := len(m.ProductCategoriesWooByID)
-	lenProductCategoriesWooBySlug := len(m.ProductCategoriesWooBySlug)
 
 	logger.Debug("До удаления из кеша:")
 	logger.Debugf("len(ProductCategoriesWooByID)=%d", lenProductCategoriesWooByID)
-	logger.Debugf("len(ProductCategoriesWooBySlug)=%d", lenProductCategoriesWooBySlug)
 
 	if m.ProductCategoriesWooByID != nil {
-		if product, found := m.ProductCategoriesWooByID[WOOID]; found {
+		if _, found := m.ProductCategoriesWooByID[WOOID]; found {
 			delete(m.ProductCategoriesWooByID, WOOID)
-			if _, found := m.ProductCategoriesWooBySlug[product.Slug]; found {
-				delete(m.ProductCategoriesWooBySlug, product.Slug)
-			} else {
-				logger.Warnf("Не найдено блюдо в кеше WOO по Slug=%s", product.Slug)
-			}
 		} else {
 			logger.Warnf("Не найдено блюдо в кеше WOO по ID=%d", WOOID)
 		}
@@ -255,14 +222,9 @@ func (m *menu) DeleteProductCategoryFromCache(WOOID int) error {
 
 	logger.Debug("После удаления из кеша:")
 	logger.Debugf("len(ProductCategoriesWooByID)=%d", len(m.ProductCategoriesWooByID))
-	logger.Debugf("len(ProductCategoriesWooBySlug)=%d", len(m.ProductCategoriesWooBySlug))
 
 	if lenProductCategoriesWooByID == len(m.ProductCategoriesWooByID) {
 		return errors.New(fmt.Sprintf("ProductCategoriesWooByID не был изменен при удалении элемента ID=%d", WOOID))
-	}
-
-	if lenProductCategoriesWooBySlug == len(m.ProductCategoriesWooBySlug) {
-		return errors.New(fmt.Sprintf("ProductCategoriesWooBySlug не был изменен при удалении элемента ID=%d", WOOID))
 	}
 
 	return nil
@@ -347,16 +309,6 @@ func (m *menu) GetProductCategoriesWooByID() (map[int]*modelsWOOAPI.ProductCateg
 		}
 	}
 	return m.ProductCategoriesWooByID, nil
-}
-
-func (m *menu) GetProductCategoriesWooBySlug() (map[string]*modelsWOOAPI.ProductCategory, error) {
-	if len(m.ProductCategoriesWooBySlug) == 0 {
-		err := m.RefreshProductCategories()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return m.ProductCategoriesWooBySlug, nil
 }
 
 func (m *menu) RefreshCateglist() error {
@@ -481,16 +433,13 @@ func (m *menu) RefreshProductCategories() error {
 	}
 
 	m.ProductCategoriesWooByID = make(map[int]*modelsWOOAPI.ProductCategory)
-	m.ProductCategoriesWooBySlug = make(map[string]*modelsWOOAPI.ProductCategory)
 
 	for i, productCategory := range productCategories {
 		logger.Debugf("Product: Name=%s, Slug=%s, ID=%d", productCategory.Name, productCategory.Slug, productCategory.ID)
 		m.ProductCategoriesWooByID[productCategory.ID] = productCategories[i]
-		m.ProductCategoriesWooBySlug[productCategory.Slug] = productCategories[i]
 	}
 
 	logger.Debugf("Длина списка ProductCategoriesWooByID = %d\n", len(m.ProductCategoriesWooByID))
-	logger.Debugf("Длина списка ProductCategoriesWooBySlug = %d\n", len(m.ProductCategoriesWooBySlug))
 
 	return nil
 }

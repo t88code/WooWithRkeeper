@@ -1,4 +1,5 @@
-package database // проверка, существует ли файл или нет
+package database
+
 import (
 	"WooWithRkeeper/pkg/logging"
 	"github.com/jmoiron/sqlx"

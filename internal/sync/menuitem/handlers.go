@@ -111,7 +111,7 @@ LoopOneStage:
 									if menuitemName == product.Name &&
 										menuitem.WOO_ID == product.ID &&
 										menuitem.WOO_PARENT_ID != 0 &&
-										menuitem.WOO_PARENT_ID == product.Categories[0].Id &&
+										menuitem.WOO_PARENT_ID == productCategoryID &&
 										menuitem.WOO_PARENT_ID == categlistParent.WOO_ID &&
 										pricetype3 == product.RegularPrice &&
 										product.Status == WOO_PRODUCT_STATUS_ACTIVE &&
@@ -179,7 +179,7 @@ LoopOneStage:
 		}
 	}
 	return nil
-}
+} // todo срань с ссылками которая мне не понятна до конца
 
 // HandlerTwoStage - 2 стадия синхронизации, запуск обработчиков по каждому статусу
 func HandlerTwoStage(menuitemsSync *[]MenuitemSync) error {
@@ -289,7 +289,7 @@ func MenuitemNulledInWooAndRk7(menuitem *modelsRK7API.MenuitemItem) error {
 
 	err := OutOfStockMenuitemInWoo(menuitem)
 	if err != nil {
-		return err
+		return err // todo error ALL
 	} else {
 		logger.Debug("Блюда успешно установлено в статус \"Нет в наличии\" в WOO")
 		err := NulledMenuitemInRK7(menuitem)
@@ -549,5 +549,9 @@ func GetMenuitemNotation(menuitem *modelsRK7API.MenuitemItem) string {
 }
 
 func GetProductNotification(product *modelsWOOAPI.Product) string {
-	return fmt.Sprintf("Name=%s, ID=%d, Categories[0].Id=%d, Slug=%s, RegularPrice=%s", product.Name, product.ID, product.Categories[0].Id, product.Slug, product.RegularPrice)
+	var productCategoryID int
+	if len(product.Categories) > 0 {
+		productCategoryID = product.Categories[0].Id
+	}
+	return fmt.Sprintf("Name=%s, ID=%d, Categories[0].Id=%d, Slug=%s, RegularPrice=%s", product.Name, product.ID, productCategoryID, product.Slug, product.RegularPrice)
 }

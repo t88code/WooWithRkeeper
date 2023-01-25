@@ -14,178 +14,7 @@ import (
 	"time"
 )
 
-type WebhookCreatOrderOld struct {
-	Version        string        `json:"version"`
-	ShippingTax    string        `json:"shipping_tax"`
-	Status         string        `json:"status"`
-	CouponLines    []interface{} `json:"coupon_lines"`
-	DateCreatedGmt string        `json:"date_created_gmt"`
-	Currency       string        `json:"currency"`
-	IsEditable     bool          `json:"is_editable"`
-	CartTax        string        `json:"cart_tax"`
-	DatePaidGmt    interface{}   `json:"date_paid_gmt"`
-	MetaData       []struct {
-		Key   string `json:"key"`
-		Id    int    `json:"id"`
-		Value string `json:"value"`
-	} `json:"meta_data"`
-	DiscountTotal     string        `json:"discount_total"`
-	TransactionId     string        `json:"transaction_id"`
-	Refunds           []interface{} `json:"refunds"`
-	DateCompletedGmt  interface{}   `json:"date_completed_gmt"`
-	NeedsProcessing   bool          `json:"needs_processing"`
-	PaymentMethod     string        `json:"payment_method"`
-	CustomerNote      string        `json:"customer_note"`
-	CustomerId        int           `json:"customer_id"`
-	ShippingTotal     string        `json:"shipping_total"`
-	CustomerUserAgent string        `json:"customer_user_agent"`
-	TotalTax          string        `json:"total_tax"`
-	CurrencySymbol    string        `json:"currency_symbol"`
-	OrderKey          string        `json:"order_key"`
-	Id                int           `json:"id"` // Order.ExtID
-	DateCompleted     interface{}   `json:"date_completed"`
-	ParentId          int           `json:"parent_id"`
-	Total             string        `json:"total"`
-	Shipping          struct {
-		State     string `json:"state"`
-		City      string `json:"city"`
-		Company   string `json:"company"`
-		Phone     string `json:"phone"`
-		FirstName string `json:"first_name"`
-		Address2  string `json:"address_2"`
-		Address1  string `json:"address_1"`
-		LastName  string `json:"last_name"`
-		Country   string `json:"country"`
-		Postcode  string `json:"postcode"`
-	} `json:"shipping"`
-	NeedsPayment bool `json:"needs_payment"`
-	LineItems    []struct {
-		Subtotal    string        `json:"subtotal"`
-		Taxes       []interface{} `json:"taxes"`
-		Quantity    int           `json:"quantity"`
-		SubtotalTax string        `json:"subtotal_tax"`
-		ParentName  interface{}   `json:"parent_name"`
-		Image       struct {
-			Id  string `json:"id"`
-			Src string `json:"src"`
-		} `json:"image"`
-		Price    int    `json:"price"`
-		Name     string `json:"name"`
-		MetaData []struct {
-			Key        string `json:"key"`
-			DisplayKey string `json:"display_key"`
-			Id         int    `json:"id"`
-			Value      struct {
-				Summary        string `json:"summary,omitempty"`
-				Duration       string `json:"duration,omitempty"`
-				Persons        string `json:"persons,omitempty"`
-				PersonType     string `json:"persontype,omitempty"`     // todo Тип заказчика (Юр.лицо/Физ.лицо)
-				CompanyDetails string `json:"companydetails,omitempty"` // todo Реквизиты Юр.лица (если выбрано Юр.лицо)
-				Comment        string
-
-				Start struct {
-					Timezone     string `json:"timezone"`
-					Date         string `json:"date"`
-					TimezoneType int    `json:"timezone_type"`
-				} `json:"start,omitempty"`
-				TimeStart string `json:"timeStart,omitempty"`
-				Resources []struct {
-					Name            string      `json:"name"`
-					Hidden          bool        `json:"hidden"`
-					TermId          int         `json:"term_id"`
-					Quantity        bool        `json:"quantity"`
-					Price           interface{} `json:"price"`
-					LimitedResource bool        `json:"limitedResource"`
-				} `json:"resources,omitempty"`
-				End struct {
-					Timezone     string `json:"timezone"`
-					Date         string `json:"date"`
-					TimezoneType int    `json:"timezone_type"`
-				} `json:"end,omitempty"`
-				Total int `json:"total,omitempty"`
-				Items []struct {
-					Label string `json:"label"`
-					Price int    `json:"price"`
-				} `json:"items,omitempty"`
-			} `json:"value"`
-			DisplayValue struct {
-				Summary  string `json:"summary,omitempty"`
-				Duration string `json:"duration,omitempty"`
-				Persons  string `json:"persons,omitempty"`
-				Start    struct {
-					Timezone     string `json:"timezone"`
-					Date         string `json:"date"`
-					TimezoneType int    `json:"timezone_type"`
-				} `json:"start,omitempty"`
-				TimeStart string `json:"timeStart,omitempty"`
-				Resources []struct {
-					Name            string      `json:"name"`
-					Hidden          bool        `json:"hidden"`
-					TermId          int         `json:"term_id"`
-					Quantity        bool        `json:"quantity"`
-					Price           interface{} `json:"price"`
-					LimitedResource bool        `json:"limitedResource"`
-				} `json:"resources,omitempty"`
-				End struct {
-					Timezone     string `json:"timezone"`
-					Date         string `json:"date"`
-					TimezoneType int    `json:"timezone_type"`
-				} `json:"end,omitempty"`
-				Total int `json:"total,omitempty"`
-				Items []struct {
-					Label string `json:"label"`
-					Price int    `json:"price"`
-				} `json:"items,omitempty"`
-			} `json:"display_value"`
-		} `json:"meta_data"`
-		TotalTax    string `json:"total_tax"`
-		Id          int    `json:"id"`
-		ProductId   int    `json:"product_id"`
-		TaxClass    string `json:"tax_class"`
-		Sku         string `json:"sku"`
-		Total       string `json:"total"`
-		VariationId int    `json:"variation_id"`
-	} `json:"line_items"`
-	CustomerIpAddress string        `json:"customer_ip_address"`
-	FeeLines          []interface{} `json:"fee_lines"`
-	PaymentUrl        string        `json:"payment_url"`
-	ShippingLines     []interface{} `json:"shipping_lines"` //+-
-	PricesIncludeTax  bool          `json:"prices_include_tax"`
-	DateModifiedGmt   string        `json:"date_modified_gmt"`
-	DiscountTax       string        `json:"discount_tax"`
-	CartHash          string        `json:"cart_hash"`
-	Number            string        `json:"number"`
-	Links             struct {      //+-
-		Self []struct {
-			Href string `json:"href"`
-		} `json:"self"`
-		Collection []struct {
-			Href string `json:"href"`
-		} `json:"collection"`
-	} `json:"_links"`
-	DateModified       string        `json:"date_modified"`
-	DatePaid           interface{}   `json:"date_paid"`
-	TaxLines           []interface{} `json:"tax_lines"`
-	PaymentMethodTitle string        `json:"payment_method_title"`
-	CreatedVia         string        `json:"created_via"`
-	DateCreated        string        `json:"date_created"`
-	Billing            struct {
-		State     string `json:"state"`
-		City      string `json:"city"`
-		Company   string `json:"company"`
-		Phone     string `json:"phone"`
-		FirstName string `json:"first_name"`
-		Address2  string `json:"address_2"`
-		Address1  string `json:"address_1"`
-		LastName  string `json:"last_name"`
-		Country   string `json:"country"`
-		Email     string `json:"email"`
-		Postcode  string `json:"postcode"`
-	} `json:"billing"`
-}
-
-type m []map[string]interface{}
-
+// WebhookCreateOrderInRKeeper - создание брони или заказа
 func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 
 	logger := logging.GetLogger()
@@ -377,7 +206,19 @@ func WebhookCreateOrderInRKeeper(jsonByteArray []byte) error {
 			return errors.Wrap(err, "ошибка в RK7API.CreateOrder")
 		} else {
 			logger.Info("Заказ в RK создан успешно")
-			_, err := RK7API.SaveOrder(order.VisitID, order.Guid, cfg.RK7MID.StationCode, dishs, nil)
+
+			prepay := new(modelsRK7API.Prepay)
+			if Deposit != 0 {
+				if WebhookCreatOrder.PaymentMethod == "" {
+					prepay.Code = cfg.RK7MID.CurrencyCode1
+				} else {
+					prepay.Code = cfg.RK7MID.CurrencyCode2 //"payment_method":"bacs"
+				}
+
+				prepay.Amount = Deposit * 100
+			}
+
+			_, err := RK7API.SaveOrder(order.VisitID, order.Guid, cfg.RK7MID.StationCode, dishs, prepay) // TODO проверить
 			if err != nil {
 				logger.Errorf("Ошибка при добавлении блюд в заказе RK, error: %v", err)
 				return errors.Wrap(err, "ошибка в RK7API.SaveOrder")

@@ -17,6 +17,7 @@ type ErrorWoo struct {
 				Data    interface{} `json:"data"`
 			} `json:"display"`
 		} `json:"details"`
+		ResourceId int `json:"resource_id"`
 	} `json:"data"`
 }
 

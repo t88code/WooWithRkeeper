@@ -53,7 +53,8 @@ type (
 			TelegramReport int
 		}
 		IMAGESYNC struct {
-			Path string
+			Path      string
+			DateAfter string
 		}
 		ORDERSYNC struct {
 			Timeout int

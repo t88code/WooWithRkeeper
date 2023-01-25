@@ -1,4 +1,4 @@
-package imagefile
+package database
 
 import "database/sql"
 
